@@ -1,0 +1,24 @@
+<Window x:Class="SqlToExcel.Views.PreviewView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SqlToExcel.Views"
+        xmlns:hc="https://handyorg.github.io/handycontrol"
+        mc:Ignorable="d"
+        Title="查询预览" Height="700" Width="1000"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        
+        <DataGrid Grid.Row="0" ItemsSource="{Binding Data}" AutoGenerateColumns="True" IsReadOnly="True" HeadersVisibility="All" LoadingRow="DataGrid_LoadingRow" AutoGeneratingColumn="DataGrid_AutoGeneratingColumn" />
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
+            <TextBlock Text="{Binding RecordCount, StringFormat='共 {0} 条记录'}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+            <Button Content="导出到Excel" Command="{Binding ExportCommand}" Margin="5" Style="{StaticResource ButtonPrimary}"/>
+        </StackPanel>
+    </Grid>
+</Window>
