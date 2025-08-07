@@ -52,6 +52,9 @@ namespace SqlToExcel.ViewModels
         public ObservableCollection<SortableColumn> SortColumns1 { get; } = new();
         public ObservableCollection<SortableColumn> SortColumns2 { get; } = new();
 
+        private List<string> _selectedColumnNames1 = new();
+        private List<string> _selectedColumnNames2 = new();
+
         public ICollectionView Tables1View { get; private set; }
         public ICollectionView Tables2View { get; private set; }
 
@@ -184,6 +187,7 @@ namespace SqlToExcel.ViewModels
             if (dbIndex == 1 && SelectedTable1 != null)
             {
                 Columns1.Clear();
+                _selectedColumnNames1.Clear();
                 DatabaseService.Instance.GetColumns("source", SelectedTable1.Name).ForEach(c => Columns1.Add(new SelectableDbColumn(c)));
 
                 if (_tableMappings.TryGetValue(SelectedTable1.Name, out var targetTable))
@@ -194,6 +198,7 @@ namespace SqlToExcel.ViewModels
             else if (dbIndex == 2 && SelectedTable2 != null)
             {
                 Columns2.Clear();
+                _selectedColumnNames2.Clear();
                 DatabaseService.Instance.GetColumns("target", SelectedTable2.Name).ForEach(c => Columns2.Add(new SelectableDbColumn(c)));
             }
         }
@@ -221,7 +226,9 @@ namespace SqlToExcel.ViewModels
         private async void OpenColumnSelector(int dbIndex)
         {
             var columns = dbIndex == 1 ? Columns1 : Columns2;
-            var viewModel = new ColumnSelectorViewModel(columns);
+            var selectedColumnNames = dbIndex == 1 ? _selectedColumnNames1 : _selectedColumnNames2;
+
+            var viewModel = new ColumnSelectorViewModel(columns, selectedColumnNames);
             var view = new ColumnSelectorView
             {
                 DataContext = viewModel,
@@ -230,9 +237,16 @@ namespace SqlToExcel.ViewModels
 
             if (view.ShowDialog() == true)
             {
-                // The ViewModel now handles updating the IsSelected property directly.
-                // We just need to regenerate the SQL based on the new selections.
-                await GenerateSqlAsync(dbIndex, columns.Where(c => c.IsSelected).ToList());
+                if (dbIndex == 1)
+                {
+                    _selectedColumnNames1 = new List<string>(viewModel.SelectedColumnNamesInOrder);
+                }
+                else
+                {
+                    _selectedColumnNames2 = new List<string>(viewModel.SelectedColumnNamesInOrder);
+                }
+                
+                await GenerateSqlAsync(dbIndex, viewModel.SelectedColumnNamesInOrder);
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -241,7 +255,7 @@ namespace SqlToExcel.ViewModels
         {
             var columns = dbIndex == 1 ? Columns1 : Columns2;
             var sortColumns = dbIndex == 1 ? SortColumns1 : SortColumns2;
-            var selectedColumnNames = columns.Where(c => c.IsSelected).Select(c => c.Column.DbColumnName);
+            var selectedColumnNames = dbIndex == 1 ? _selectedColumnNames1 : _selectedColumnNames2;
 
             var viewModel = new ColumnSortViewModel(selectedColumnNames, sortColumns);
             var view = new ColumnSortView
@@ -258,14 +272,14 @@ namespace SqlToExcel.ViewModels
                     sortColumns.Add(sc);
                 }
                 // Regenerate SQL after sorting
-                var selectedColumns = (dbIndex == 1 ? Columns1 : Columns2).Where(c => c.IsSelected).ToList();
+                var selectedColumns = dbIndex == 1 ? _selectedColumnNames1 : _selectedColumnNames2;
                 await GenerateSqlAsync(dbIndex, selectedColumns);
             }
         }
 
-        public async Task GenerateSqlAsync(int dbIndex, List<SelectableDbColumn> selectedColumns)
+        public async Task GenerateSqlAsync(int dbIndex, List<string> selectedColumnNames)
         {
-            if (!selectedColumns.Any()) return;
+            if (!selectedColumnNames.Any()) return;
 
             DbTableInfo? selectedTable = dbIndex == 1 ? SelectedTable1 : SelectedTable2;
 
@@ -285,22 +299,30 @@ namespace SqlToExcel.ViewModels
                 topClause = $"TOP {MaxRowCount} ";
             }
 
-            var selectedColumnNames = string.Join(", ", selectedColumns.Select(c => c.Column.DbColumnName));
+            var sqlBuilder = new System.Text.StringBuilder();
+            sqlBuilder.Append("SELECT ");
+            if (!string.IsNullOrEmpty(topClause))
+            {
+                sqlBuilder.Append(topClause);
+            }
+            sqlBuilder.AppendLine();
+            sqlBuilder.AppendLine("    " + string.Join("," + Environment.NewLine + "    ", selectedColumnNames));
+            sqlBuilder.AppendLine($"FROM {tableName}");
 
             var sortColumns = dbIndex == 1 ? SortColumns1 : SortColumns2;
-            string orderByClause = "";
             if (sortColumns.Any())
             {
-                orderByClause = " ORDER BY " + string.Join(", ", sortColumns.Select(sc => $"{sc.ColumnName} {(sc.Direction == SortDirection.Ascending ? "ASC" : "DESC")}"));
+                sqlBuilder.AppendLine("ORDER BY");
+                sqlBuilder.AppendLine("    " + string.Join("," + Environment.NewLine + "    ", sortColumns.Select(sc => $"{sc.ColumnName} {(sc.Direction == SortDirection.Ascending ? "ASC" : "DESC")}")));
             }
 
             if (dbIndex == 1)
             {
-                SqlQuery1 = $"SELECT {topClause}{selectedColumnNames} FROM {tableName}{orderByClause}";
+                SqlQuery1 = sqlBuilder.ToString();
             }
             else if (dbIndex == 2)
             {
-                SqlQuery2 = $"SELECT {topClause}{selectedColumnNames} FROM {tableName}{orderByClause}";
+                SqlQuery2 = sqlBuilder.ToString();
             }
         }
 

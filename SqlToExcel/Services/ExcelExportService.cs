@@ -1,13 +1,21 @@
 using Microsoft.Win32;
-using MiniExcelLibs;
+using OfficeOpenXml;
 using SqlToExcel.ViewModels;
 using System.Data;
+using System.IO;
+using OfficeOpenXml.Style;
+using System.Drawing;
 using System.Windows;
 
 namespace SqlToExcel.Services
 {
     public class ExcelExportService
     {
+        static ExcelExportService()
+        {
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        }
+
         public async Task<DataTable> GetDataTableAsync(string sql, string dbKey)
         {
             var db = DatabaseService.Instance.Db;
@@ -15,7 +23,47 @@ namespace SqlToExcel.Services
             {
                 throw new InvalidOperationException("数据库连接未初始化。");
             }
-            return await db.GetConnection(dbKey.ToLower()).Ado.GetDataTableAsync(sql);
+
+            var dt = await db.GetConnection(dbKey.ToLower()).Ado.GetDataTableAsync(sql);
+
+            // Correct column names
+            var tableName = ExtractTableNameFromSql(sql);
+            if (!string.IsNullOrEmpty(tableName))
+            {
+                var columns = DatabaseService.Instance.GetColumns(dbKey, tableName);
+                if (columns.Count == dt.Columns.Count)
+                {
+                    for (int i = 0; i < dt.Columns.Count; i++)
+                    {
+                        dt.Columns[i].ColumnName = columns[i].DbColumnName;
+                    }
+                }
+            }
+
+            return dt;
+        }
+
+        private string ExtractTableNameFromSql(string sql)
+        {
+            try
+            {
+                var fromIndex = sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
+                if (fromIndex == -1) return string.Empty;
+
+                var fromSubstring = sql.Substring(fromIndex + 4).Trim();
+                
+                var orderByIndex = fromSubstring.IndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
+                if (orderByIndex != -1)
+                {
+                    fromSubstring = fromSubstring.Substring(0, orderByIndex).Trim();
+                }
+
+                return fromSubstring.Split(' ').FirstOrDefault() ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty; // Fail silently if parsing fails
+            }
         }
 
         public async Task ExportToExcel(MainViewModel vm)
@@ -85,7 +133,64 @@ namespace SqlToExcel.Services
 
             if (saveFileDialog.ShowDialog() == true)
             {
-                MiniExcel.SaveAs(saveFileDialog.FileName, sheets);
+                using (var package = new ExcelPackage(new FileInfo(saveFileDialog.FileName)))
+                {
+                    foreach (var sheet in sheets)
+                    {
+                        var worksheet = package.Workbook.Worksheets.Add(sheet.Key);
+
+                        if (sheet.Value is DataTable dt)
+                        {
+                            // Manually load data to enforce text format
+                            // Header
+                            for (int i = 0; i < dt.Columns.Count; i++)
+                            {
+                                worksheet.Cells[1, i + 1].Value = dt.Columns[i].ColumnName;
+                            }
+
+                            // Data
+                            for (int i = 0; i < dt.Rows.Count; i++)
+                            {
+                                for (int j = 0; j < dt.Columns.Count; j++)
+                                {
+                                    var cell = worksheet.Cells[i + 2, j + 1];
+                                    cell.Value = dt.Rows[i][j].ToString();
+                                    cell.Style.Numberformat.Format = "@";
+                                }
+                            }
+                        }
+                        else
+                        {
+                            worksheet.Cells["A1"].LoadFromCollection(sheet.Value as IEnumerable<object>, true);
+                        }
+
+                        var dataRange = worksheet.Dimension;
+                        if (dataRange == null) continue;
+
+                        // Style the header
+                        var header = worksheet.Cells[1, 1, 1, dataRange.End.Column];
+                        header.Style.Font.Bold = true;
+                        header.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        header.Style.Fill.BackgroundColor.SetColor(Color.DodgerBlue);
+                        header.Style.Font.Color.SetColor(Color.White);
+                        header.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+                        header.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+
+                        // Add AutoFilter
+                        worksheet.Cells[dataRange.Address].AutoFilter = true;
+                        
+                        // Custom column width adjustment first
+                        for (int i = 1; i <= dataRange.End.Column; i++)
+                        {
+                            worksheet.Column(i).AutoFit();
+                            worksheet.Column(i).Width = worksheet.Column(i).Width + 1;
+                        }
+
+                        // Then enable WrapText
+                        worksheet.Cells[dataRange.Address].Style.WrapText = true;
+                    }
+                    package.Save();
+                }
             }
         }
     }

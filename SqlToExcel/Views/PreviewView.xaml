@@ -14,7 +14,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <DataGrid Grid.Row="0" ItemsSource="{Binding Data}" AutoGenerateColumns="True" IsReadOnly="True" HeadersVisibility="All" LoadingRow="DataGrid_LoadingRow" AutoGeneratingColumn="DataGrid_AutoGeneratingColumn" />
+        <DataGrid Grid.Row="0" ItemsSource="{Binding Data}" AutoGenerateColumns="True" Style="{StaticResource CustomDataGridStyle}" HeadersVisibility="All" LoadingRow="DataGrid_LoadingRow" AutoGeneratingColumn="DataGrid_AutoGeneratingColumn" />
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
             <TextBlock Text="{Binding RecordCount, StringFormat='共 {0} 条记录'}" VerticalAlignment="Center" Margin="0,0,20,0" />

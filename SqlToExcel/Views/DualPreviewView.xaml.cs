@@ -17,12 +17,14 @@ namespace SqlToExcel.Views
 
         private void DataGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
         {
+            e.Column.Header = e.PropertyName;
+            
             if (e.PropertyType == typeof(bool))
             {
                 var textColumn = new DataGridTextColumn
                 {
                     Header = e.Column.Header,
-                    Binding = new System.Windows.Data.Binding(e.PropertyName)
+                    Binding = new System.Windows.Data.Binding(e.PropertyName) { Converter = (System.Windows.Data.IValueConverter)FindResource("BoolToZeroOneConverter") }
                 };
                 e.Column = textColumn;
             }

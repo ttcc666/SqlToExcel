@@ -9,8 +9,10 @@ namespace SqlToExcel.ViewModels
     {
         private string _columnText;
         private bool _isUpdating;
+        private readonly List<SelectableDbColumn> _selectedColumnsInOrder;
 
         public ObservableCollection<SelectableDbColumn> Columns { get; }
+        public List<string> SelectedColumnNamesInOrder { get; private set; }
         public ICommand OkCommand { get; }
         public ICommand CancelCommand { get; }
 
@@ -28,10 +30,26 @@ namespace SqlToExcel.ViewModels
             }
         }
 
-        public ColumnSelectorViewModel(IEnumerable<SelectableDbColumn> columns)
+        public ColumnSelectorViewModel(IEnumerable<SelectableDbColumn> columns, IEnumerable<string> previouslySelectedNames)
         {
             Columns = new ObservableCollection<SelectableDbColumn>(columns);
-            _columnText = string.Join(Environment.NewLine, Columns.Where(c => c.IsSelected).Select(c => c.Column.DbColumnName));
+            SelectedColumnNamesInOrder = new List<string>(previouslySelectedNames);
+
+            _selectedColumnsInOrder = new List<SelectableDbColumn>();
+            foreach (var name in SelectedColumnNamesInOrder)
+            {
+                var column = Columns.FirstOrDefault(c => c.Column.DbColumnName.Equals(name, StringComparison.OrdinalIgnoreCase));
+                if (column != null)
+                {
+                    column.IsSelected = true;
+                    if (!_selectedColumnsInOrder.Contains(column))
+                    {
+                        _selectedColumnsInOrder.Add(column);
+                    }
+                }
+            }
+            
+            _columnText = string.Join(Environment.NewLine, SelectedColumnNamesInOrder);
 
             foreach (var col in Columns)
             {
@@ -46,29 +64,56 @@ namespace SqlToExcel.ViewModels
         {
             if (e.PropertyName == nameof(SelectableDbColumn.IsSelected) && !_isUpdating)
             {
-                UpdateTextFromSelection();
+                var column = sender as SelectableDbColumn;
+                if (column != null)
+                {
+                    if (column.IsSelected)
+                    {
+                        if (!_selectedColumnsInOrder.Contains(column))
+                        {
+                            _selectedColumnsInOrder.Add(column);
+                        }
+                    }
+                    else
+                    {
+                        _selectedColumnsInOrder.Remove(column);
+                    }
+                    UpdateTextFromSelection();
+                }
             }
         }
 
         private void UpdateTextFromSelection()
         {
             _isUpdating = true;
-            ColumnText = string.Join(Environment.NewLine, Columns.Where(c => c.IsSelected).Select(c => c.Column.DbColumnName));
+            ColumnText = string.Join(Environment.NewLine, _selectedColumnsInOrder.Select(c => c.Column.DbColumnName));
+            SelectedColumnNamesInOrder = _selectedColumnsInOrder.Select(c => c.Column.DbColumnName).ToList();
             _isUpdating = false;
         }
 
         private void UpdateSelectionFromText()
         {
             _isUpdating = true;
-            var selectedNames = new HashSet<string>(
-                ColumnText.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries),
-                StringComparer.OrdinalIgnoreCase
-            );
+            var selectedNames = ColumnText.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries);
+            var selectedNamesSet = new HashSet<string>(selectedNames, StringComparer.OrdinalIgnoreCase);
+
+            _selectedColumnsInOrder.Clear();
 
             foreach (var col in Columns)
             {
-                col.IsSelected = selectedNames.Contains(col.Column.DbColumnName);
+                col.IsSelected = selectedNamesSet.Contains(col.Column.DbColumnName);
             }
+
+            // Re-populate _selectedColumnsInOrder in the new order from the text
+            foreach (var name in selectedNames)
+            {
+                var column = Columns.FirstOrDefault(c => c.Column.DbColumnName.Equals(name, StringComparison.OrdinalIgnoreCase));
+                if (column != null && !_selectedColumnsInOrder.Contains(column))
+                {
+                    _selectedColumnsInOrder.Add(column);
+                }
+            }
+            SelectedColumnNamesInOrder = _selectedColumnsInOrder.Select(c => c.Column.DbColumnName).ToList();
             _isUpdating = false;
         }
 

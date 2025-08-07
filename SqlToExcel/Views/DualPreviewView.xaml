@@ -19,7 +19,7 @@
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <DataGrid x:Name="DataGrid1" Grid.Row="0" ItemsSource="{Binding Data1}" AutoGenerateColumns="True" IsReadOnly="True" HeadersVisibility="All" LoadingRow="DataGrid_LoadingRow" AutoGeneratingColumn="DataGrid_AutoGeneratingColumn" />
+            <DataGrid x:Name="DataGrid1" Grid.Row="0" ItemsSource="{Binding Data1}" AutoGenerateColumns="True" Style="{StaticResource CustomDataGridStyle}" HeadersVisibility="All" LoadingRow="DataGrid_LoadingRow" AutoGeneratingColumn="DataGrid_AutoGeneratingColumn" />
             <TextBlock Grid.Row="1" Text="{Binding RecordCount1, StringFormat='共 {0} 条记录'}" HorizontalAlignment="Right" Margin="5" />
         </Grid>
 
@@ -30,7 +30,7 @@
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <DataGrid x:Name="DataGrid2" Grid.Row="0" ItemsSource="{Binding Data2}" AutoGenerateColumns="True" IsReadOnly="True" HeadersVisibility="All" LoadingRow="DataGrid_LoadingRow" AutoGeneratingColumn="DataGrid_AutoGeneratingColumn" />
+            <DataGrid x:Name="DataGrid2" Grid.Row="0" ItemsSource="{Binding Data2}" AutoGenerateColumns="True" Style="{StaticResource CustomDataGridStyle}" HeadersVisibility="All" LoadingRow="DataGrid_LoadingRow" AutoGeneratingColumn="DataGrid_AutoGeneratingColumn" />
             <TextBlock Grid.Row="1" Text="{Binding RecordCount2, StringFormat='共 {0} 条记录'}" HorizontalAlignment="Right" Margin="5" />
         </Grid>
     </Grid>
