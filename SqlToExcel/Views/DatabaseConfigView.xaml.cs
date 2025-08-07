@@ -1,5 +1,5 @@
-using System.Windows;
 using SqlToExcel.ViewModels;
+using System.Windows;
 
 namespace SqlToExcel.Views
 {

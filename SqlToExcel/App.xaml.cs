@@ -1,10 +1,6 @@
-﻿using System.Linq;
-using System.Windows;
-using System;
-
+﻿using System.Windows;
 
 namespace SqlToExcel;
-
 
 /// <summary>
 /// Interaction logic for App.xaml
@@ -27,4 +23,3 @@ public partial class App : Application
         dictionaries.Add(newSkin);
     }
 }
-

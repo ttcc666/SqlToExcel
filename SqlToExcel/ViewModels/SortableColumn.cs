@@ -14,6 +14,7 @@ namespace SqlToExcel.ViewModels
         private SortDirection _direction;
 
         public string ColumnName { get; }
+
         public SortDirection Direction
         {
             get => _direction;
@@ -27,6 +28,7 @@ namespace SqlToExcel.ViewModels
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

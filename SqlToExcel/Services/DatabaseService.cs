@@ -1,8 +1,4 @@
 using SqlSugar;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using SqlToExcel.Properties;
 
 namespace SqlToExcel.Services
 {
@@ -13,7 +9,8 @@ namespace SqlToExcel.Services
 
         public SqlSugarScope? Db { get; private set; }
 
-        private DatabaseService() { }
+        private DatabaseService()
+        { }
 
         public bool IsConfigured()
         {

@@ -1,10 +1,7 @@
 using Microsoft.Win32;
 using MiniExcelLibs;
 using SqlToExcel.ViewModels;
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Threading.Tasks;
 using System.Windows;
 
 namespace SqlToExcel.Services
@@ -93,4 +90,3 @@ namespace SqlToExcel.Services
         }
     }
 }
-

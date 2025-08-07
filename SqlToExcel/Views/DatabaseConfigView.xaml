@@ -11,28 +11,28 @@
         ResizeMode="NoResize">
     <Grid Margin="15">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
-        <TextBlock Text="源数据库(Source):" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
-        <hc:TextBox Text="{Binding SourceConnectionString, UpdateSourceTrigger=PropertyChanged}" Grid.Row="0" Grid.Column="1" Margin="5"/>
-        <Button Content="测试连接" Command="{Binding TestSourceConnectionCommand}" Grid.Row="0" Grid.Column="2" Margin="5,0,0,0"/>
+        <TextBlock Text="源数据库(Source):" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
+        <hc:TextBox Text="{Binding SourceConnectionString, UpdateSourceTrigger=PropertyChanged}" Grid.Row="0" Grid.Column="1" Margin="5" />
+        <Button Content="测试连接" Command="{Binding TestSourceConnectionCommand}" Grid.Row="0" Grid.Column="2" Margin="5,0,0,0" />
 
-        <TextBlock Text="目标数据库(Target):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center"/>
-        <hc:TextBox Text="{Binding TargetConnectionString, UpdateSourceTrigger=PropertyChanged}" Grid.Row="1" Grid.Column="1" Margin="5"/>
-        <Button Content="测试连接" Command="{Binding TestTargetConnectionCommand}" Grid.Row="1" Grid.Column="2" Margin="5,0,0,0"/>
+        <TextBlock Text="目标数据库(Target):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" />
+        <hc:TextBox Text="{Binding TargetConnectionString, UpdateSourceTrigger=PropertyChanged}" Grid.Row="1" Grid.Column="1" Margin="5" />
+        <Button Content="测试连接" Command="{Binding TestTargetConnectionCommand}" Grid.Row="1" Grid.Column="2" Margin="5,0,0,0" />
 
         <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="保存" Command="{Binding SaveCommand}" IsDefault="True" Style="{StaticResource ButtonPrimary}" Margin="0,0,10,0"/>
-            <Button Content="取消" IsCancel="True"/>
+            <Button Content="保存" Command="{Binding SaveCommand}" IsDefault="True" Style="{StaticResource ButtonPrimary}" Margin="0,0,10,0" />
+            <Button Content="取消" IsCancel="True" />
         </StackPanel>
     </Grid>
 </Window>

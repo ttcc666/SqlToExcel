@@ -1,10 +1,8 @@
-using System;
+using SqlSugar;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Input;
-using SqlSugar;
-using SqlToExcel.Properties;
 
 namespace SqlToExcel.ViewModels
 {
@@ -55,7 +53,7 @@ namespace SqlToExcel.ViewModels
                 {
                     ConnectionString = connectionString,
                     DbType = DbType.SqlServer,
-                    IsAutoCloseConnection = true 
+                    IsAutoCloseConnection = true
                 });
 
                 // A more reliable way to test a connection is to simply open it.
@@ -77,7 +75,7 @@ namespace SqlToExcel.ViewModels
             Properties.Settings.Default.SourceConnectionString = SourceConnectionString;
             Properties.Settings.Default.TargetConnectionString = TargetConnectionString;
             Properties.Settings.Default.Save();
-            
+
             MessageBox.Show("配置已保存。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             window?.Close();
         }
@@ -90,4 +88,3 @@ namespace SqlToExcel.ViewModels
         }
     }
 }
-

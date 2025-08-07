@@ -1,20 +1,15 @@
-using System;
-using System.Collections.Generic;
+using SqlSugar;
+using SqlToExcel.Services;
+using SqlToExcel.Views;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Input;
 using System.Windows.Data;
-using SqlToExcel.Services;
-using SqlToExcel.Views;
-using SqlSugar;
-using HandyControl.Themes;
+using System.Windows.Input;
 
 namespace SqlToExcel.ViewModels
 {
@@ -140,7 +135,7 @@ namespace SqlToExcel.ViewModels
             Tables2View = CollectionViewSource.GetDefaultView(Tables2);
             Tables2View.Filter = FilterTables2;
         }
-        
+
         public void CheckDatabaseConfiguration()
         {
             if (DatabaseService.Instance.IsConfigured())
@@ -190,7 +185,7 @@ namespace SqlToExcel.ViewModels
             {
                 Columns1.Clear();
                 DatabaseService.Instance.GetColumns("source", SelectedTable1.Name).ForEach(c => Columns1.Add(new SelectableDbColumn(c)));
-                
+
                 if (_tableMappings.TryGetValue(SelectedTable1.Name, out var targetTable))
                 {
                     SelectedTable2 = Tables2.FirstOrDefault(t => t.Name.Equals(targetTable, StringComparison.OrdinalIgnoreCase));
@@ -222,7 +217,6 @@ namespace SqlToExcel.ViewModels
             }
             return false;
         }
-
 
         private async void OpenColumnSelector(int dbIndex)
         {
@@ -309,7 +303,6 @@ namespace SqlToExcel.ViewModels
                 SqlQuery2 = $"SELECT {topClause}{selectedColumnNames} FROM {tableName}{orderByClause}";
             }
         }
-
 
         private void OpenConfig()
         {

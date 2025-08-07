@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
@@ -55,6 +52,7 @@ namespace SqlToExcel.ViewModels
         }
 
         private bool CanAddColumn() => SelectedAvailableColumn != null && !SortColumns.Any(sc => sc.ColumnName == SelectedAvailableColumn.ColumnName);
+
         private void AddColumn()
         {
             if (SelectedAvailableColumn != null)
@@ -64,6 +62,7 @@ namespace SqlToExcel.ViewModels
         }
 
         private bool CanRemoveColumn() => SelectedSortColumn != null;
+
         private void RemoveColumn()
         {
             if (SelectedSortColumn != null)
@@ -71,8 +70,9 @@ namespace SqlToExcel.ViewModels
                 SortColumns.Remove(SelectedSortColumn);
             }
         }
-        
+
         private bool CanMoveUp() => SelectedSortColumn != null && SortColumns.IndexOf(SelectedSortColumn) > 0;
+
         private void MoveUp()
         {
             if (CanMoveUp())
@@ -83,6 +83,7 @@ namespace SqlToExcel.ViewModels
         }
 
         private bool CanMoveDown() => SelectedSortColumn != null && SortColumns.IndexOf(SelectedSortColumn) < SortColumns.Count - 1;
+
         private void MoveDown()
         {
             if (CanMoveDown())
@@ -102,6 +103,7 @@ namespace SqlToExcel.ViewModels
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

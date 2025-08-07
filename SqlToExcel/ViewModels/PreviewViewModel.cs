@@ -1,6 +1,6 @@
+using SqlToExcel.Services;
 using System.Data;
 using System.Windows.Input;
-using SqlToExcel.Services;
 
 namespace SqlToExcel.ViewModels
 {

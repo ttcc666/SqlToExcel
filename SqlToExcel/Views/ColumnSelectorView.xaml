@@ -15,22 +15,22 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <TextBox Grid.Row="0" Text="{Binding ColumnText, UpdateSourceTrigger=PropertyChanged}" 
+        <TextBox Grid.Row="0" Text="{Binding ColumnText, UpdateSourceTrigger=PropertyChanged}"
                  AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"
                  hc:InfoElement.Placeholder="Enter one column name per line."
                  VerticalContentAlignment="Top"
-                 Height="100"/>
+                 Height="100" />
         <ListBox Grid.Row="1" ItemsSource="{Binding Columns}" Margin="0,5,0,0">
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <CheckBox Content="{Binding Column.DbColumnName}" IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
+                    <CheckBox Content="{Binding Column.DbColumnName}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
-        
+
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
-            <Button Content="OK" Command="{Binding OkCommand}" CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}" IsDefault="True" MinWidth="60" Margin="5"/>
-            <Button Content="Cancel" Command="{Binding CancelCommand}" CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}" IsCancel="True" MinWidth="60" Margin="5"/>
+            <Button Content="OK" Command="{Binding OkCommand}" CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}" IsDefault="True" MinWidth="60" Margin="5" />
+            <Button Content="Cancel" Command="{Binding CancelCommand}" CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}" IsCancel="True" MinWidth="60" Margin="5" />
         </StackPanel>
     </Grid>
 </Window>

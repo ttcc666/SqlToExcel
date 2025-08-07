@@ -13,12 +13,12 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        
+
         <DataGrid Grid.Row="0" ItemsSource="{Binding Data}" AutoGenerateColumns="True" IsReadOnly="True" HeadersVisibility="All" LoadingRow="DataGrid_LoadingRow" AutoGeneratingColumn="DataGrid_AutoGeneratingColumn" />
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
-            <TextBlock Text="{Binding RecordCount, StringFormat='共 {0} 条记录'}" VerticalAlignment="Center" Margin="0,0,20,0"/>
-            <Button Content="导出到Excel" Command="{Binding ExportCommand}" Margin="5" Style="{StaticResource ButtonPrimary}"/>
+            <TextBlock Text="{Binding RecordCount, StringFormat='共 {0} 条记录'}" VerticalAlignment="Center" Margin="0,0,20,0" />
+            <Button Content="导出到Excel" Command="{Binding ExportCommand}" Margin="5" Style="{StaticResource ButtonPrimary}" />
         </StackPanel>
     </Grid>
 </Window>

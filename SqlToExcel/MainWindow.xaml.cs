@@ -1,6 +1,5 @@
-using SqlToExcel.ViewModels;
-using System.Windows;
 using HandyControl.Controls;
+using SqlToExcel.ViewModels;
 
 namespace SqlToExcel
 {
@@ -13,7 +12,7 @@ namespace SqlToExcel
             DataContext = viewModel;
 
             // This ensures that the event is raised after the window is fully loaded
-            this.Loaded += (s, e) => 
+            this.Loaded += (s, e) =>
             {
                 viewModel.CheckDatabaseConfiguration();
             };
