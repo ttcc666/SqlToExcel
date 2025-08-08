@@ -1,0 +1,28 @@
+[
+  {
+    "key": "注册证信息",
+    "dataSource": {
+      "sheetName": "T_License",
+      "sql": "SELECT * FROM T_License",
+      "description": "Export all users from the source database."
+    },
+    "dataTarget": {
+      "sheetName": "Lic_License",
+      "sql": "SELECT * FROM T_License",
+      "description": "Count of all users in the target database."
+    }
+  },
+  {
+    "key": "Product_Inventory",
+    "dataSource": {
+      "sheetName": "Products",
+      "sql": "SELECT ProductId, ProductName, Stock FROM Products",
+      "description": "Export product inventory from the source."
+    },
+    "dataTarget": {
+      "sheetName": "ProductSummary",
+      "sql": "SELECT Category, COUNT(*) FROM Products GROUP BY Category",
+      "description": "Product count by category in the target."
+    }
+  }
+]

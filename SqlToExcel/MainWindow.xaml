@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SqlToExcel"
         xmlns:hc="https://handyorg.github.io/handycontrol"
+        xmlns:views="clr-namespace:SqlToExcel.Views"
         mc:Ignorable="d"
         Title="SQL to Excel Exporter" Height="800" Width="1200"
         Icon="/Icon/icon.ico"
@@ -26,73 +27,80 @@
             </MenuItem>
         </Menu>
 
-        <Grid Grid.Row="1" Margin="10" IsEnabled="{Binding IsCoreFunctionalityEnabled}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="20" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <TabControl Grid.Row="1">
+            <TabItem Header="手动导出">
+                <Grid Margin="10" IsEnabled="{Binding IsCoreFunctionalityEnabled}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="20" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-            <!-- Source Query -->
-            <hc:Card Header="查询 1 (源数据库)" Grid.Column="0" Margin="0,0,10,0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <StackPanel Orientation="Horizontal" Margin="5">
-                        <TextBlock Text="选择表:" VerticalAlignment="Center" />
-                        <hc:ComboBox ItemsSource="{Binding Tables1View}" SelectedItem="{Binding SelectedTable1}" Text="{Binding SearchText1, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Name" Width="200" Margin="5,0" IsEditable="True" IsTextSearchEnabled="True" />
-                        <Button Content="选择列" Command="{Binding OpenColumnSelectorCommand1}" Margin="5" hc:IconElement.Geometry="{StaticResource App.PlaylistEdit}" />
-                        <Button Content="排序" Command="{Binding OpenSortDialogCommand1}" Margin="5" hc:IconElement.Geometry="{StaticResource App.Sort}" />
-                    </StackPanel>
+                    <!-- Source Query -->
+                    <hc:Card Header="查询 1 (源数据库)" Grid.Column="0" Margin="0,0,10,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Orientation="Horizontal" Margin="5">
+                                <TextBlock Text="选择表:" VerticalAlignment="Center" />
+                                <hc:ComboBox ItemsSource="{Binding Tables1View}" SelectedItem="{Binding SelectedTable1}" Text="{Binding SearchText1, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Name" Width="200" Margin="5,0" IsEditable="True" IsTextSearchEnabled="True" />
+                                <Button Content="选择列" Command="{Binding OpenColumnSelectorCommand1}" Margin="5" hc:IconElement.Geometry="{StaticResource App.PlaylistEdit}" />
+                                <Button Content="排序" Command="{Binding OpenSortDialogCommand1}" Margin="5" hc:IconElement.Geometry="{StaticResource App.Sort}" />
+                            </StackPanel>
 
-                    <hc:Divider Grid.Row="1" Margin="5" />
+                            <hc:Divider Grid.Row="1" Margin="5" />
 
-                    <hc:TextBox Grid.Row="2" Text="{Binding SqlQuery1, UpdateSourceTrigger=PropertyChanged}"
-                             AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Margin="5"
-                             FontFamily="Consolas" VerticalContentAlignment="Top" />
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="5">
-                        <TextBlock Text="Sheet 名称:" VerticalAlignment="Center" />
-                        <hc:TextBox Text="{Binding SheetName1, UpdateSourceTrigger=PropertyChanged}" Width="200" Margin="5,0" />
-                        <Button Content="预览" Command="{Binding Preview1Command}" Style="{StaticResource ButtonPrimary}" hc:IconElement.Geometry="{StaticResource App.Eye}" />
-                    </StackPanel>
+                            <hc:TextBox Grid.Row="2" Text="{Binding SqlQuery1, UpdateSourceTrigger=PropertyChanged}"
+                                     AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Margin="5"
+                                     FontFamily="Consolas" VerticalContentAlignment="Top" />
+                            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="5">
+                                <TextBlock Text="Sheet 名称:" VerticalAlignment="Center" />
+                                <hc:TextBox Text="{Binding SheetName1, UpdateSourceTrigger=PropertyChanged}" Width="200" Margin="5,0" />
+                                <Button Content="预览" Command="{Binding Preview1Command}" Style="{StaticResource ButtonPrimary}" hc:IconElement.Geometry="{StaticResource App.Eye}" />
+                            </StackPanel>
+                        </Grid>
+                    </hc:Card>
+
+                    <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" />
+
+                    <!-- Target Query -->
+                    <hc:Card Header="查询 2 (目标数据库)" Grid.Column="2" Margin="10,0,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Orientation="Horizontal" Margin="5">
+                                <TextBlock Text="选择表:" VerticalAlignment="Center" />
+                                <hc:ComboBox ItemsSource="{Binding Tables2View}" SelectedItem="{Binding SelectedTable2}" Text="{Binding SearchText2, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Name" Width="200" Margin="5,0" IsEditable="True" IsTextSearchEnabled="True" />
+                                <Button Content="选择列" Command="{Binding OpenColumnSelectorCommand2}" Margin="5" hc:IconElement.Geometry="{StaticResource App.PlaylistEdit}" />
+                                <Button Content="排序" Command="{Binding OpenSortDialogCommand2}" Margin="5" hc:IconElement.Geometry="{StaticResource App.Sort}" />
+                            </StackPanel>
+
+                            <hc:Divider Grid.Row="2" Margin="5" />
+
+                            <hc:TextBox Grid.Row="2" Text="{Binding SqlQuery2, UpdateSourceTrigger=PropertyChanged}"
+                                     AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Margin="5"
+                                     FontFamily="Consolas" VerticalContentAlignment="Top" />
+                            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="5">
+                                <TextBlock Text="Sheet 名称:" VerticalAlignment="Center" />
+                                <hc:TextBox Text="{Binding SheetName2, UpdateSourceTrigger=PropertyChanged}" Width="200" Margin="5,0" />
+                                <Button Content="预览" Command="{Binding Preview2Command}" Style="{StaticResource ButtonPrimary}" hc:IconElement.Geometry="{StaticResource App.Eye}" />
+                            </StackPanel>
+                        </Grid>
+                    </hc:Card>
                 </Grid>
-            </hc:Card>
-
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" />
-
-            <!-- Target Query -->
-            <hc:Card Header="查询 2 (目标数据库)" Grid.Column="2" Margin="10,0,0,0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <StackPanel Orientation="Horizontal" Margin="5">
-                        <TextBlock Text="选择表:" VerticalAlignment="Center" />
-                        <hc:ComboBox ItemsSource="{Binding Tables2View}" SelectedItem="{Binding SelectedTable2}" Text="{Binding SearchText2, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Name" Width="200" Margin="5,0" IsEditable="True" IsTextSearchEnabled="True" />
-                        <Button Content="选择列" Command="{Binding OpenColumnSelectorCommand2}" Margin="5" hc:IconElement.Geometry="{StaticResource App.PlaylistEdit}" />
-                        <Button Content="排序" Command="{Binding OpenSortDialogCommand2}" Margin="5" hc:IconElement.Geometry="{StaticResource App.Sort}" />
-                    </StackPanel>
-
-                    <hc:Divider Grid.Row="2" Margin="5" />
-
-                    <hc:TextBox Grid.Row="2" Text="{Binding SqlQuery2, UpdateSourceTrigger=PropertyChanged}"
-                             AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Margin="5"
-                             FontFamily="Consolas" VerticalContentAlignment="Top" />
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="5">
-                        <TextBlock Text="Sheet 名称:" VerticalAlignment="Center" />
-                        <hc:TextBox Text="{Binding SheetName2, UpdateSourceTrigger=PropertyChanged}" Width="200" Margin="5,0" />
-                        <Button Content="预览" Command="{Binding Preview2Command}" Style="{StaticResource ButtonPrimary}" hc:IconElement.Geometry="{StaticResource App.Eye}" />
-                    </StackPanel>
-                </Grid>
-            </hc:Card>
-        </Grid>
+            </TabItem>
+            <TabItem Header="批量导出">
+                <views:BatchExportView x:Name="BatchExportView" />
+            </TabItem>
+        </TabControl>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="10" HorizontalAlignment="Right">
              <TextBlock Text="最大查询行:" VerticalAlignment="Center" Margin="0,0,5,25" />

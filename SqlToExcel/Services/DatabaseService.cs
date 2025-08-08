@@ -19,12 +19,12 @@ namespace SqlToExcel.Services
             return !string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(target);
         }
 
-        public void Initialize()
+        public bool Initialize()
         {
             if (!IsConfigured())
             {
                 Db = null;
-                return;
+                return true;
             }
 
             var sourceConn = new ConnectionConfig()
@@ -43,7 +43,18 @@ namespace SqlToExcel.Services
                 IsAutoCloseConnection = true
             };
 
-            Db = new SqlSugarScope(new List<ConnectionConfig> { sourceConn, targetConn });
+                        try
+            {
+                Db = new SqlSugarScope(new List<ConnectionConfig> { sourceConn, targetConn });
+                Db.GetConnection("source").Ado.IsValidConnection();
+                Db.GetConnection("target").Ado.IsValidConnection();
+                return true;
+            }
+            catch (Exception)
+            {
+                Db = null;
+                return false;
+            }
         }
 
         public List<DbTableInfo> GetTables(string dbKey)

@@ -66,41 +66,53 @@ namespace SqlToExcel.Services
             }
         }
 
-        public async Task ExportToExcel(MainViewModel vm)
+        public async Task ExportToExcelAsync(string sqlSource, string sheetNameSource, string sqlTarget, string sheetNameTarget, string exportKey)
         {
             try
             {
-                vm.StatusMessage = "正在执行查询...";
-                var task1 = GetDataTableAsync(vm.SqlQuery1, "source");
-                var task2 = GetDataTableAsync(vm.SqlQuery2, "target");
+                var task1 = GetDataTableAsync(sqlSource, "source");
+                var task2 = GetDataTableAsync(sqlTarget, "target");
 
                 await Task.WhenAll(task1, task2);
 
                 DataTable dt1 = task1.Result;
                 DataTable dt2 = task2.Result;
 
-                vm.StatusMessage = "正在准备要导出的数据...";
-
                 var sqlLog = new List<object>
                 {
-                    new { SheetName = vm.SheetName1, SQL_Query = vm.SqlQuery1 },
-                    new { SheetName = vm.SheetName2, SQL_Query = vm.SqlQuery2 }
+                    new { SheetName = sheetNameSource, SQL_Query = sqlSource },
+                    new { SheetName = sheetNameTarget, SQL_Query = sqlTarget }
                 };
 
                 var sheets = new Dictionary<string, object>
                 {
-                    [vm.SheetName1] = dt1,
-                    [vm.SheetName2] = dt2,
+                    [sheetNameSource] = dt1,
+                    [sheetNameTarget] = dt2,
                     ["SQL查询记录"] = sqlLog
                 };
 
-                SaveSheetsToFile(sheets, $"Export_All_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+                SaveSheetsToFile(sheets, $"Export_{exportKey}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+                MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"导出过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                throw; // Re-throw to be caught by the caller if needed
+            }
+        }
+
+        public async Task ExportToExcel(MainViewModel vm)
+        {
+            try
+            {
+                vm.StatusMessage = "正在执行查询...";
+                await ExportToExcelAsync(vm.SqlQuery1, vm.SheetName1, vm.SqlQuery2, vm.SheetName2, "All");
                 vm.StatusMessage = "文件已成功导出。";
             }
             catch (Exception ex)
             {
                 vm.StatusMessage = $"导出失败: {ex.Message}";
-                MessageBox.Show($"导出过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                // The message box is already shown in the new method, so we don't need it here.
             }
         }
 

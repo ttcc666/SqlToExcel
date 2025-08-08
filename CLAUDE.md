@@ -11,7 +11,7 @@ To build and run the application, use the following commands from the root direc
 
 ## Architecture
 
-This is a .NET WPF application designed to connect to two separate SQL databases, execute queries against them, and export the results into a single Excel file. The application allows for both automatic SQL generation and manual query editing.
+This is a .NET WPF application designed to connect to two separate SQL databases, execute queries against them, and export the results into a single Excel file. The application allows for both automatic SQL generation and manual query editing. A key feature is the automatic mapping of tables between the source and target databases, configured via `table_mappings.json`.
 
 The project follows the MVVM (Model-View-ViewModel) design pattern:
 
@@ -23,7 +23,7 @@ The project follows the MVVM (Model-View-ViewModel) design pattern:
   - `ColumnSelectorView.xaml`: A dialog for selecting tables and columns to dynamically generate `SELECT` statements.
   - `ColumnSortView.xaml`: A dialog for defining the `ORDER BY` clause for a query.
 - **ViewModels**: Contains the presentation logic for the views.
-  - `MainViewModel.cs`: The main view model, managing the two database contexts and coordinating the UI.
+  - `MainViewModel.cs`: The main view model, managing the two database contexts and coordinating the UI. It handles loading tables and columns, generating SQL queries, and orchestrating previews and exports.
   - `DatabaseConfigViewModel.cs`: The view model for the database configuration view.
   - `PreviewViewModel.cs`: The view model for the single query preview.
   - `DualPreviewViewModel.cs`: The view model for the dual query preview.
@@ -31,16 +31,16 @@ The project follows the MVVM (Model-View-ViewModel) design pattern:
   - `ColumnSortViewModel.cs`: The view model for the column sorting dialog.
   - `RelayCommand.cs`: A generic `ICommand` implementation for MVVM.
 - **Services**: Contains the core business logic.
-  - `DatabaseService.cs`: Handles database connections and executing queries using `SqlSugarCore`.
-  - `ExcelExportService.cs`: Handles exporting data from both queries into a single Excel file using `MiniExcel`.
+  - `DatabaseService.cs`: Handles database connections and executing queries using `SqlSugarCore`. It manages two database contexts: "source" and "target".
+  - `ExcelExportService.cs`: Handles exporting data from both queries into a single Excel file using `EPPlus`.
 
 ### Key Libraries
 
 - **HandyControl**: A UI library providing modern controls for WPF.
 - **SqlSugarCore**: Used as an ORM to interact with the SQL databases.
-- **MiniExcel**: Used to generate Excel files from the query results.
+- **EPPlus**: Used to generate Excel files from the query results.
 - **Microsoft.Data.SqlClient**: The ADO.NET provider for SQL Server.
 
 ## Theme Switching
 
-The application uses a custom theme switching mechanism located in `App.xaml.cs`. The `UpdateTheme` method takes a skin name ("Dark" or "Default") and switches the application's theme by replacing the skin's `ResourceDictionary` in the application's merged dictionaries. This allows for dynamic changing between light and dark modes.
+The application uses a custom theme switching mechanism located in `App.xaml.cs`. The `UpdateTheme` method takes a skin name ("Dark" or "Default") and switches the application's theme by replacing the skin's `ResourceDictionary` in the application's merged dictionaries. This allows for dynamic changing between light and dark modes, triggered from the `MainViewModel`.

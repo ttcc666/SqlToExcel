@@ -143,10 +143,21 @@ namespace SqlToExcel.ViewModels
         {
             if (DatabaseService.Instance.IsConfigured())
             {
-                DatabaseService.Instance.Initialize();
-                IsCoreFunctionalityEnabled = true;
-                StatusMessage = "数据库已连接，准备就绪。";
-                LoadTables();
+                if (DatabaseService.Instance.Initialize())
+                {
+                    IsCoreFunctionalityEnabled = true;
+                    StatusMessage = "数据库已连接，准备就绪。";
+                    LoadTables();
+                }
+                else
+                {
+                    IsCoreFunctionalityEnabled = false;
+                    StatusMessage = "数据库连接失败，请检查连接字符串。";
+                    if (Application.Current.MainWindow != null && Application.Current.MainWindow.IsLoaded)
+                    {
+                        OpenConfig();
+                    }
+                }
             }
             else
             {
