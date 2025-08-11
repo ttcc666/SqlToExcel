@@ -1,5 +1,4 @@
 using SqlToExcel.Models;
-using SqlToExcel.Services;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -8,13 +7,13 @@ namespace SqlToExcel.ViewModels
 {
     public class BatchExportConfigItemViewModel : INotifyPropertyChanged
     {
-        private readonly BatchExportConfig _config;
-        private readonly ExcelExportService _exportService;
-        private string _status = "Ready";
+        public BatchExportConfig Config { get; }
+        private string _status = "准备就绪";
+        private bool _isSelected = false;
 
-        public string Key => _config.Key;
-        public string SourceDescription => _config.DataSource.Description;
-        public string TargetDescription => _config.DataTarget.Description;
+        public string Key => Config.Key;
+        public string SourceDescription => Config.DataSource.Description;
+        public string TargetDescription => Config.DataTarget.Description;
 
         public string Status
         {
@@ -22,32 +21,22 @@ namespace SqlToExcel.ViewModels
             set { _status = value; OnPropertyChanged(); }
         }
 
-        public ICommand ExportCommand { get; }
-
-        public BatchExportConfigItemViewModel(BatchExportConfig config, ExcelExportService exportService)
+        public bool IsSelected
         {
-            _config = config;
-            _exportService = exportService;
-            ExportCommand = new RelayCommand(async p => await ExportAsync(), p => Status != "Exporting...");
+            get => _isSelected;
+            set { _isSelected = value; OnPropertyChanged(); }
         }
 
-        private async Task ExportAsync()
+        // Commands are now handled by the parent BatchExportViewModel
+        public ICommand? ExportCommand { get; set; }
+        public ICommand? PreviewCommand { get; set; }
+        public ICommand? DeleteCommand { get; set; }
+        public ICommand? EditCommand { get; set; }
+
+
+        public BatchExportConfigItemViewModel(BatchExportConfig config)
         {
-            Status = "Exporting...";
-            try
-            {
-                await _exportService.ExportToExcelAsync(
-                    _config.DataSource.Sql,
-                    _config.DataSource.SheetName,
-                    _config.DataTarget.Sql,
-                    _config.DataTarget.SheetName,
-                    _config.Key);
-                Status = "Success";
-            }
-            catch (Exception ex)
-            {
-                Status = $"Failed: {ex.Message}";
-            }
+            Config = config;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

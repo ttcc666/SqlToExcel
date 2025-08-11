@@ -1,0 +1,40 @@
+<Window x:Class="SqlToExcel.Views.BatchExportProgressDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:hc="https://handyorg.github.io/handycontrol"
+        Title="批量导出进度" Height="250" Width="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="正在批量导出配置..." FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+        
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="当前进度: " VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding CurrentProgress}" VerticalAlignment="Center" FontWeight="Bold"/>
+            <TextBlock Text=" / " VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding TotalCount}" VerticalAlignment="Center" FontWeight="Bold"/>
+        </StackPanel>
+
+        <ProgressBar Grid.Row="2" Value="{Binding ProgressPercentage}" Maximum="100" Height="20" Margin="0,0,0,10"/>
+        
+        <TextBlock Grid.Row="3" Text="{Binding CurrentItemText}" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+        <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto" MaxHeight="80">
+            <TextBlock Text="{Binding LogText}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"/>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="取消" Command="{Binding CancelCommand}" Width="80" Margin="0,0,10,0"/>
+            <Button Content="关闭" Command="{Binding CloseCommand}" Width="80" IsEnabled="{Binding IsCompleted}"/>
+        </StackPanel>
+    </Grid>
+</Window>

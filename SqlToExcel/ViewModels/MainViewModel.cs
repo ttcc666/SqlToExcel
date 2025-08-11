@@ -1,4 +1,6 @@
+using Microsoft.Win32;
 using SqlSugar;
+using SqlToExcel.Models;
 using SqlToExcel.Services;
 using SqlToExcel.Views;
 using System.Collections.ObjectModel;
@@ -10,6 +12,10 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Linq;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace SqlToExcel.ViewModels
 {
@@ -36,6 +42,14 @@ namespace SqlToExcel.ViewModels
         }
     }
 
+    public class JsonMapping
+    {
+        public string old_table { get; set; }
+        public List<string> old_fields { get; set; }
+        public string new_table { get; set; }
+        public List<string> new_fields { get; set; }
+    }
+
     public class MainViewModel : INotifyPropertyChanged
     {
         private string _sqlQuery1 = "";
@@ -44,6 +58,10 @@ namespace SqlToExcel.ViewModels
         private string _sheetName2 = "TargetData";
         private string _statusMessage = "准备就绪";
         private bool _isCoreFunctionalityEnabled = false;
+        private bool _isJsonImported = false;
+        private bool _isEditMode = false;
+        private string _editingConfigKey = "";
+        private BatchExportConfig? _originalConfig = null;
 
         public ObservableCollection<DbTableInfo> Tables1 { get; } = new();
         public ObservableCollection<DbTableInfo> Tables2 { get; } = new();
@@ -76,14 +94,32 @@ namespace SqlToExcel.ViewModels
         public DbTableInfo? SelectedTable1
         {
             get => _selectedTable1;
-            set { _selectedTable1 = value; OnPropertyChanged(); LoadColumns(1); }
+            set
+            {
+                _selectedTable1 = value;
+                OnPropertyChanged();
+                LoadColumns(1);
+                if (value != null)
+                {
+                    SheetName1 = $"{value.Name} (Source)";
+                }
+            }
         }
 
         private DbTableInfo? _selectedTable2;
         public DbTableInfo? SelectedTable2
         {
             get => _selectedTable2;
-            set { _selectedTable2 = value; OnPropertyChanged(); LoadColumns(2); }
+            set
+            {
+                _selectedTable2 = value;
+                OnPropertyChanged();
+                LoadColumns(2);
+                if (value != null)
+                {
+                    SheetName2 = $"{value.Name} (Target)";
+                }
+            }
         }
 
         private Dictionary<string, string> _tableMappings = new();
@@ -94,6 +130,18 @@ namespace SqlToExcel.ViewModels
         public string SheetName2 { get => _sheetName2; set { _sheetName2 = value; OnPropertyChanged(); } }
         public string StatusMessage { get => _statusMessage; set { _statusMessage = value; OnPropertyChanged(); } }
         public bool IsCoreFunctionalityEnabled { get => _isCoreFunctionalityEnabled; set { _isCoreFunctionalityEnabled = value; OnPropertyChanged(); } }
+        public bool IsJsonImported { get => _isJsonImported; set { _isJsonImported = value; OnPropertyChanged(); } }
+        
+        public bool IsEditMode
+        {
+            get => _isEditMode;
+            private set
+            {
+                _isEditMode = value;
+                OnPropertyChanged();
+                CommandManager.InvalidateRequerySuggested();
+            }
+        }
 
         private int _maxRowCount = 5000;
         public int MaxRowCount
@@ -113,37 +161,48 @@ namespace SqlToExcel.ViewModels
         public ICommand OpenSortDialogCommand1 { get; }
         public ICommand OpenSortDialogCommand2 { get; }
         public ICommand SwitchThemeCommand { get; }
-
+        public ICommand SaveConfigCommand { get; }
+        public ICommand ImportJsonCommand { get; }
+        public ICommand ResetCommand { get; }
+ 
         private readonly ExcelExportService _exportService;
+        private readonly ThemeService _themeService;
 
-        public MainViewModel()
+        public MainViewModel(ExcelExportService exportService, ThemeService themeService)
         {
-            _exportService = new ExcelExportService();
+            _exportService = exportService;
+            _themeService = themeService;
             OpenConfigCommand = new RelayCommand(p => OpenConfig());
             ExitCommand = new RelayCommand(p => Application.Current.Shutdown());
             ExportCommand = new RelayCommand(async p => await ExportAsync(), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery1) && !string.IsNullOrWhiteSpace(SqlQuery2));
             Preview1Command = new RelayCommand(async p => await PreviewAsync(SqlQuery1, SheetName1, "Source"), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery1));
             Preview2Command = new RelayCommand(async p => await PreviewAsync(SqlQuery2, SheetName2, "Target"), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery2));
             PreviewBothCommand = new RelayCommand(async p => await PreviewBothAsync(), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery1) && !string.IsNullOrWhiteSpace(SqlQuery2));
-            OpenColumnSelectorCommand1 = new RelayCommand(p => OpenColumnSelector(1), p => SelectedTable1 != null);
-            OpenColumnSelectorCommand2 = new RelayCommand(p => OpenColumnSelector(2), p => SelectedTable2 != null);
+            OpenColumnSelectorCommand1 = new RelayCommand(p => OpenColumnSelector(1), p => SelectedTable1 != null && !IsJsonImported);
+            OpenColumnSelectorCommand2 = new RelayCommand(p => OpenColumnSelector(2), p => SelectedTable2 != null && !IsJsonImported);
             OpenSortDialogCommand1 = new RelayCommand(p => OpenSortDialog(1), p => Columns1.Any(c => c.IsSelected));
             OpenSortDialogCommand2 = new RelayCommand(p => OpenSortDialog(2), p => Columns2.Any(c => c.IsSelected));
             SwitchThemeCommand = new RelayCommand(p => SwitchTheme());
-
+            SaveConfigCommand = new RelayCommand(async p => await SaveConfigAsync(), p => CanSaveConfig());
+            ImportJsonCommand = new RelayCommand(async p => await ImportJsonAsync(), p => !IsJsonImported);
+            ResetCommand = new RelayCommand(p => ResetState(), p => IsJsonImported || IsEditMode);
+ 
             LoadTableMappings();
-
+ 
             Tables1View = CollectionViewSource.GetDefaultView(Tables1);
             Tables1View.Filter = FilterTables1;
             Tables2View = CollectionViewSource.GetDefaultView(Tables2);
             Tables2View.Filter = FilterTables2;
+
+            EventService.Subscribe<MappingsChangedEvent>(e => LoadTableMappings());
+            EventService.Subscribe<LoadConfigToMainViewEvent>(OnLoadConfigToMainView);
         }
 
         public void CheckDatabaseConfiguration()
         {
-            if (DatabaseService.Instance.IsConfigured())
+            if (DatabaseService.Instance.Initialize())
             {
-                if (DatabaseService.Instance.Initialize())
+                if (DatabaseService.Instance.IsConfigured())
                 {
                     IsCoreFunctionalityEnabled = true;
                     StatusMessage = "数据库已连接，准备就绪。";
@@ -152,7 +211,7 @@ namespace SqlToExcel.ViewModels
                 else
                 {
                     IsCoreFunctionalityEnabled = false;
-                    StatusMessage = "数据库连接失败，请检查连接字符串。";
+                    StatusMessage = "数据库未配置，请从“文件”菜单中打开配置。";
                     if (Application.Current.MainWindow != null && Application.Current.MainWindow.IsLoaded)
                     {
                         OpenConfig();
@@ -162,25 +221,21 @@ namespace SqlToExcel.ViewModels
             else
             {
                 IsCoreFunctionalityEnabled = false;
-                StatusMessage = "数据库未配置，请从“文件”菜单中打开配置。";
-                if (Application.Current.MainWindow != null && Application.Current.MainWindow.IsLoaded)
-                {
-                    OpenConfig();
-                }
+                StatusMessage = "数据库初始化失败，请检查应用权限或重启应用。";
+                MessageBox.Show(StatusMessage, "严重错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private void LoadTableMappings()
+        private async void LoadTableMappings()
         {
             try
             {
-                var json = File.ReadAllText("table_mappings.json");
-                var mappings = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
-                _tableMappings = new Dictionary<string, string>(mappings, StringComparer.OrdinalIgnoreCase);
+                var mappings = await ConfigService.Instance.GetTableMappingsAsync();
+                _tableMappings = mappings.ToDictionary(m => m.SourceTable, m => m.TargetTable, StringComparer.OrdinalIgnoreCase);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"加载表映射时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"从数据库加载表映射时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 _tableMappings = new Dictionary<string, string>();
             }
         }
@@ -201,9 +256,10 @@ namespace SqlToExcel.ViewModels
                 _selectedColumnNames1.Clear();
                 DatabaseService.Instance.GetColumns("source", SelectedTable1.Name).ForEach(c => Columns1.Add(new SelectableDbColumn(c)));
 
-                if (_tableMappings.TryGetValue(SelectedTable1.Name, out var targetTable))
+                var key = SelectedTable1.Name.Split('.').Last();
+                if (_tableMappings.TryGetValue(key, out var targetTable))
                 {
-                    SelectedTable2 = Tables2.FirstOrDefault(t => t.Name.Equals(targetTable, StringComparison.OrdinalIgnoreCase));
+                    SelectedTable2 = Tables2.FirstOrDefault(t => t.Name.Split('.').Last().Equals(targetTable, StringComparison.OrdinalIgnoreCase));
                 }
             }
             else if (dbIndex == 2 && SelectedTable2 != null)
@@ -257,7 +313,7 @@ namespace SqlToExcel.ViewModels
                     _selectedColumnNames2 = new List<string>(viewModel.SelectedColumnNamesInOrder);
                 }
                 
-                await GenerateSqlAsync(dbIndex, viewModel.SelectedColumnNamesInOrder);
+                await GenerateSqlAsync(dbIndex, viewModel.SelectedColumnNamesInOrder.Select(c => $"[{c}]").ToList());
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -282,9 +338,8 @@ namespace SqlToExcel.ViewModels
                 {
                     sortColumns.Add(sc);
                 }
-                // Regenerate SQL after sorting
                 var selectedColumns = dbIndex == 1 ? _selectedColumnNames1 : _selectedColumnNames2;
-                await GenerateSqlAsync(dbIndex, selectedColumns);
+                await GenerateSqlAsync(dbIndex, selectedColumns.Select(c => $"[{c}]").ToList());
             }
         }
 
@@ -318,13 +373,29 @@ namespace SqlToExcel.ViewModels
             }
             sqlBuilder.AppendLine();
             sqlBuilder.AppendLine("    " + string.Join("," + Environment.NewLine + "    ", selectedColumnNames));
-            sqlBuilder.AppendLine($"FROM {tableName}");
+            sqlBuilder.AppendLine($"FROM [{tableName}]");
 
             var sortColumns = dbIndex == 1 ? SortColumns1 : SortColumns2;
             if (sortColumns.Any())
             {
+                var columns = dbIndex == 1 ? Columns1 : Columns2;
+                var sortClauses = sortColumns.Select(sc =>
+                {
+                    var colInfo = columns.FirstOrDefault(c => c.Column.DbColumnName == sc.ColumnName)?.Column;
+                    string collation = "";
+                    if (colInfo != null)
+                    {
+                        string dataType = colInfo.DataType.ToLower();
+                        if (dataType.Contains("char") || dataType.Contains("text"))
+                        {
+                            collation = " COLLATE Chinese_PRC_CI_AS";
+                        }
+                    }
+                    return $"[{sc.ColumnName}]{collation} {(sc.Direction == SortDirection.Ascending ? "ASC" : "DESC")}";
+                });
+
                 sqlBuilder.AppendLine("ORDER BY");
-                sqlBuilder.AppendLine("    " + string.Join("," + Environment.NewLine + "    ", sortColumns.Select(sc => $"{sc.ColumnName} {(sc.Direction == SortDirection.Ascending ? "ASC" : "DESC")}")));
+                sqlBuilder.AppendLine("    " + string.Join("," + Environment.NewLine + "    ", sortClauses));
             }
 
             if (dbIndex == 1)
@@ -417,15 +488,570 @@ namespace SqlToExcel.ViewModels
 
         private void SwitchTheme()
         {
-            var app = (App)Application.Current;
             _isDarkTheme = !_isDarkTheme;
-            app.UpdateTheme(_isDarkTheme ? "Dark" : "Default");
+            _themeService.ChangeTheme(_isDarkTheme ? "Dark" : "Default");
         }
 
+        private bool CanSaveConfig()
+        {
+            return IsCoreFunctionalityEnabled &&
+                   !string.IsNullOrWhiteSpace(SqlQuery1) &&
+                   !string.IsNullOrWhiteSpace(SqlQuery2) &&
+                   !string.IsNullOrWhiteSpace(SheetName1) &&
+                   !string.IsNullOrWhiteSpace(SheetName2);
+        }
+
+        private async Task SaveConfigAsync()
+        {
+            try
+            {
+                SaveConfigViewModel saveConfigViewModel;
+                
+                if (_isEditMode)
+                {
+                    // 编辑模式：创建临时配置对象并传入
+                    var tempConfig = new BatchExportConfig
+                    {
+                        Key = _editingConfigKey,
+                        DataSource = new QueryConfig
+                        {
+                            SheetName = SheetName1,
+                            TableName = SelectedTable1?.Name,
+                            Sql = SqlQuery1,
+                            Description = ""
+                        },
+                        DataTarget = new QueryConfig
+                        {
+                            SheetName = SheetName2,
+                            TableName = SelectedTable2?.Name,
+                            Sql = SqlQuery2,
+                            Description = ""
+                        }
+                    };
+                    saveConfigViewModel = new SaveConfigViewModel(tempConfig);
+                }
+                else
+                {
+                    // 新增模式：使用标准构造函数
+                    saveConfigViewModel = new SaveConfigViewModel(SqlQuery1, SheetName1, SqlQuery2, SheetName2);
+                }
+                
+                var saveConfigDialog = new SaveConfigDialog
+                {
+                    DataContext = saveConfigViewModel,
+                    Owner = Application.Current.MainWindow
+                };
+
+                if (saveConfigDialog.ShowDialog() == true)
+                {
+                    var config = new BatchExportConfig
+                    {
+                        Key = saveConfigViewModel.ConfigKey,
+                        DataSource = new QueryConfig
+                        {
+                            SheetName = SheetName1,
+                            TableName = SelectedTable1?.Name,
+                            Sql = SqlQuery1,
+                            Description = saveConfigViewModel.SourceDescription
+                        },
+                        DataTarget = new QueryConfig
+                        {
+                            SheetName = SheetName2,
+                            TableName = SelectedTable2?.Name,
+                            Sql = SqlQuery2,
+                            Description = saveConfigViewModel.TargetDescription
+                        }
+                    };
+
+                    // 如果是编辑模式且Key改变了，则先删除原配置
+                    bool shouldDeleteOriginal = _isEditMode && !string.IsNullOrEmpty(_editingConfigKey) &&
+                                              !_editingConfigKey.Equals(config.Key, StringComparison.OrdinalIgnoreCase);
+
+                    if (shouldDeleteOriginal)
+                    {
+                        await ConfigService.Instance.DeleteConfigAsync(_editingConfigKey);
+                    }
+
+                    if (await ConfigService.Instance.SaveConfigAsync(config, true))
+                    {
+                        string message = _isEditMode ?
+                            $"配置 '{config.Key}' 已成功更新。" :
+                            $"配置 '{config.Key}' 已成功保存。";
+                        
+                        StatusMessage = message;
+                        
+                        var result = MessageBox.Show(
+                            _isEditMode ?
+                                "配置已成功更新。是否要切换到批量导出页面查看？" :
+                                "配置已成功保存。是否要切换到批量导出页面查看？",
+                            _isEditMode ? "更新成功" : "保存成功",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Information);
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            // Placeholder for switching to batch export tab
+                        }
+
+                        // 清除编辑模式状态并重置界面
+                        ResetState();
+                    }
+                    else
+                    {
+                        StatusMessage = _isEditMode ? "更新配置失败。" : "保存配置失败。";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"保存配置时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusMessage = "保存配置时出错。";
+            }
+        }
+
+        private async Task ImportJsonAsync()
+        {
+            var importViewModel = new ImportJsonViewModel();
+            var importDialog = new ImportJsonDialog
+            {
+                DataContext = importViewModel,
+                Owner = Application.Current.MainWindow
+            };
+
+            if (importDialog.ShowDialog() == true && !string.IsNullOrEmpty(importViewModel.ResultJson))
+            {
+                try
+                {
+                    StatusMessage = "正在应用JSON配置...";
+                    var mapping = JsonSerializer.Deserialize<JsonMapping>(importViewModel.ResultJson);
+
+                    if (mapping == null || string.IsNullOrEmpty(mapping.old_table) || string.IsNullOrEmpty(mapping.new_table))
+                    {
+                        throw new Exception("JSON内容无效或缺少必要的表信息。");
+                    }
+
+                    var sourceTable = Tables1.FirstOrDefault(t => t.Name.Equals(mapping.old_table, StringComparison.OrdinalIgnoreCase));
+                    var targetTable = Tables2.FirstOrDefault(t => t.Name.Equals(mapping.new_table, StringComparison.OrdinalIgnoreCase));
+
+                    if (sourceTable == null) throw new Exception($"在源数据库中找不到表: {mapping.old_table}");
+                    if (targetTable == null) throw new Exception($"在目标数据库中找不到表: {mapping.new_table}");
+
+                    SelectedTable1 = sourceTable;
+                    SelectedTable2 = targetTable;
+
+                    // Source Columns
+                    _selectedColumnNames1.Clear();
+                    Columns1.ToList().ForEach(c => c.IsSelected = false);
+                    var columnsForSql1 = new List<string>();
+                    var sourceColumnCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var colName in mapping.old_fields)
+                    {
+                        var col = Columns1.FirstOrDefault(c => c.Column.DbColumnName.Equals(colName, StringComparison.OrdinalIgnoreCase));
+                        if (col == null)
+                        {
+                            columnsForSql1.Add($"NULL AS [{colName}]");
+                        }
+                        else
+                        {
+                            col.IsSelected = true;
+                            _selectedColumnNames1.Add(col.Column.DbColumnName);
+
+                            if (sourceColumnCounts.ContainsKey(colName))
+                            {
+                                sourceColumnCounts[colName]++;
+                                columnsForSql1.Add($"[{col.Column.DbColumnName}] AS [{colName}{sourceColumnCounts[colName]}]");
+                            }
+                            else
+                            {
+                                sourceColumnCounts[colName] = 1;
+                                columnsForSql1.Add($"[{col.Column.DbColumnName}]");
+                            }
+                        }
+                    }
+
+                    // Target Columns
+                    _selectedColumnNames2.Clear();
+                    Columns2.ToList().ForEach(c => c.IsSelected = false);
+                    var columnsForSql2 = new List<string>();
+                    var targetColumnCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var colName in mapping.new_fields)
+                    {
+                        var col = Columns2.FirstOrDefault(c => c.Column.DbColumnName.Equals(colName, StringComparison.OrdinalIgnoreCase));
+                        if (col == null)
+                        {
+                            columnsForSql2.Add($"NULL AS [{colName}]");
+                        }
+                        else
+                        {
+                            col.IsSelected = true;
+                            _selectedColumnNames2.Add(col.Column.DbColumnName);
+
+                            if (targetColumnCounts.ContainsKey(colName))
+                            {
+                                targetColumnCounts[colName]++;
+                                columnsForSql2.Add($"[{col.Column.DbColumnName}] AS [{colName}{targetColumnCounts[colName]}]");
+                            }
+                            else
+                            {
+                                targetColumnCounts[colName] = 1;
+                                columnsForSql2.Add($"[{col.Column.DbColumnName}]");
+                            }
+                        }
+                    }
+
+                    await GenerateSqlAsync(1, columnsForSql1);
+                    await GenerateSqlAsync(2, columnsForSql2);
+
+                    IsJsonImported = true;
+                    StatusMessage = "JSON配置已成功应用。";
+                    MessageBox.Show("JSON配置已成功应用。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    StatusMessage = "应用配置失败。";
+                    MessageBox.Show($"应用JSON配置时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+ 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private void ResetState()
+        {
+            SelectedTable1 = null;
+            SelectedTable2 = null;
+            SqlQuery1 = "";
+            SqlQuery2 = "";
+            SheetName1 = "SourceData";
+            SheetName2 = "TargetData";
+            Columns1.Clear();
+            Columns2.Clear();
+            SortColumns1.Clear();
+            SortColumns2.Clear();
+            _selectedColumnNames1.Clear();
+            _selectedColumnNames2.Clear();
+            IsJsonImported = false;
+            IsEditMode = false;
+            _editingConfigKey = "";
+            StatusMessage = "状态已重置。";
+        }
+
+        private void OnLoadConfigToMainView(LoadConfigToMainViewEvent eventArgs)
+        {
+            Application.Current.Dispatcher.Invoke(async () =>
+            {
+                try
+                {
+                    await LoadConfigToMainViewAsync(eventArgs.Config, eventArgs.IsEditMode, eventArgs.OriginalKey);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"加载配置到主界面时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            });
+        }
+
+        private async Task LoadConfigToMainViewAsync(BatchExportConfig config, bool isEditMode = false, string originalKey = "")
+        {
+            try
+            {
+                StatusMessage = "正在加载配置到主界面...";
+
+                // 重置状态
+                ResetState();
+
+                // 设置编辑模式（在重置之后）
+                IsEditMode = isEditMode;
+                _editingConfigKey = originalKey;
+
+                // 解析SQL以提取表名和列信息
+                var sourceTableName = ExtractTableNameFromSql(config.DataSource.Sql);
+                var targetTableName = ExtractTableNameFromSql(config.DataTarget.Sql);
+
+                // 查找并选择表
+                var sourceTable = Tables1.FirstOrDefault(t => t.Name.Equals(sourceTableName, StringComparison.OrdinalIgnoreCase));
+                var targetTable = Tables2.FirstOrDefault(t => t.Name.Equals(targetTableName, StringComparison.OrdinalIgnoreCase));
+
+                if (sourceTable != null)
+                {
+                    SelectedTable1 = sourceTable;
+                    await LoadColumnsFromSqlAsync(1, config.DataSource.Sql);
+                }
+
+                if (targetTable != null)
+                {
+                    SelectedTable2 = targetTable;
+                    await LoadColumnsFromSqlAsync(2, config.DataTarget.Sql);
+                }
+
+                // 设置SQL和Sheet名称
+                SqlQuery1 = config.DataSource.Sql;
+                SqlQuery2 = config.DataTarget.Sql;
+                SheetName1 = config.DataSource.SheetName;
+                SheetName2 = config.DataTarget.SheetName;
+
+                StatusMessage = isEditMode ? "编辑模式：配置已加载到主界面，列选择和排序信息已映射。" : "配置已加载到主界面，列选择和排序信息已映射。";
+                
+                MessageBox.Show(
+                    isEditMode ?
+                        $"编辑模式：配置 '{originalKey}' 已加载到主界面。列选择和排序状态已恢复，您可以继续编辑。保存时将更新原配置。" :
+                        "配置已加载到主界面。列选择和排序状态已恢复，您可以继续编辑。",
+                    isEditMode ? "编辑配置" : "配置加载成功",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "加载配置失败。";
+                throw new Exception($"加载配置到主界面时出错: {ex.Message}", ex);
+            }
+        }
+
+        private async Task LoadColumnsFromSqlAsync(int dbIndex, string sql)
+        {
+            try
+            {
+                // 解析SELECT列
+                var selectedColumns = ExtractSelectedColumnsFromSql(sql);
+                var sortColumns = ExtractSortColumnsFromSql(sql);
+
+                // 获取对应的集合
+                var columns = dbIndex == 1 ? Columns1 : Columns2;
+                var selectedColumnNames = dbIndex == 1 ? _selectedColumnNames1 : _selectedColumnNames2;
+                var sortColumnsCollection = dbIndex == 1 ? SortColumns1 : SortColumns2;
+
+                // 设置列选择状态
+                selectedColumnNames.Clear();
+                foreach (var col in columns)
+                {
+                    col.IsSelected = false;
+                }
+
+                foreach (var selectedCol in selectedColumns)
+                {
+                    var matchingCol = columns.FirstOrDefault(c =>
+                        c.Column.DbColumnName.Equals(selectedCol, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (matchingCol != null)
+                    {
+                        matchingCol.IsSelected = true;
+                        selectedColumnNames.Add(matchingCol.Column.DbColumnName);
+                    }
+                }
+
+                // 设置排序状态
+                sortColumnsCollection.Clear();
+                foreach (var sortCol in sortColumns)
+                {
+                    var matchingCol = columns.FirstOrDefault(c =>
+                        c.Column.DbColumnName.Equals(sortCol.ColumnName, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (matchingCol != null)
+                    {
+                        var sortableColumn = new SortableColumn(sortCol.ColumnName);
+                        sortableColumn.Direction = sortCol.Direction;
+                        sortColumnsCollection.Add(sortableColumn);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // 如果解析失败，至少保证基本功能可用
+                System.Diagnostics.Debug.WriteLine($"解析SQL列信息时出错: {ex.Message}");
+            }
+        }
+
+        private List<string> ExtractSelectedColumnsFromSql(string sql)
+        {
+            var columns = new List<string>();
+            try
+            {
+                var selectIndex = sql.IndexOf("SELECT", StringComparison.OrdinalIgnoreCase);
+                var fromIndex = sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
+                
+                if (selectIndex == -1 || fromIndex == -1) return columns;
+
+                var selectPart = sql.Substring(selectIndex + 6, fromIndex - selectIndex - 6).Trim();
+                
+                // 移除TOP子句
+                var topMatch = System.Text.RegularExpressions.Regex.Match(selectPart, @"^\s*TOP\s+\d+\s+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (topMatch.Success)
+                {
+                    selectPart = selectPart.Substring(topMatch.Length).Trim();
+                }
+
+                // 按逗号分割列，但要注意处理方括号
+                var columnParts = SplitSqlColumns(selectPart);
+                
+                foreach (var part in columnParts)
+                {
+                    var trimmedPart = part.Trim();
+                    
+                    // 处理别名情况（如 [column] AS [alias] 或 column AS alias）
+                    var asIndex = trimmedPart.LastIndexOf(" AS ", StringComparison.OrdinalIgnoreCase);
+                    string columnName;
+                    
+                    if (asIndex > 0)
+                    {
+                        // 有别名，取AS前面的部分
+                        columnName = trimmedPart.Substring(0, asIndex).Trim();
+                    }
+                    else
+                    {
+                        columnName = trimmedPart;
+                    }
+                    
+                    // 移除方括号
+                    columnName = columnName.Trim('[', ']');
+                    
+                    // 跳过NULL AS的情况
+                    if (!columnName.Equals("NULL", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columns.Add(columnName);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"解析SELECT列时出错: {ex.Message}");
+            }
+            
+            return columns;
+        }
+
+        private List<string> SplitSqlColumns(string selectPart)
+        {
+            var result = new List<string>();
+            var current = "";
+            var bracketDepth = 0;
+            
+            for (int i = 0; i < selectPart.Length; i++)
+            {
+                char c = selectPart[i];
+                
+                if (c == '[')
+                {
+                    bracketDepth++;
+                    current += c;
+                }
+                else if (c == ']')
+                {
+                    bracketDepth--;
+                    current += c;
+                }
+                else if (c == ',' && bracketDepth == 0)
+                {
+                    result.Add(current.Trim());
+                    current = "";
+                }
+                else
+                {
+                    current += c;
+                }
+            }
+            
+            if (!string.IsNullOrWhiteSpace(current))
+            {
+                result.Add(current.Trim());
+            }
+            
+            return result;
+        }
+
+        private List<(string ColumnName, SortDirection Direction)> ExtractSortColumnsFromSql(string sql)
+        {
+            var sortColumns = new List<(string, SortDirection)>();
+            try
+            {
+                var orderByIndex = sql.IndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
+                if (orderByIndex == -1) return sortColumns;
+
+                var orderByPart = sql.Substring(orderByIndex + 8).Trim();
+                
+                // 按逗号分割排序列
+                var sortParts = orderByPart.Split(',');
+                
+                foreach (var part in sortParts)
+                {
+                    var trimmedPart = part.Trim();
+                    
+                    // 移除COLLATE子句
+                    var collateIndex = trimmedPart.IndexOf(" COLLATE ", StringComparison.OrdinalIgnoreCase);
+                    if (collateIndex > 0)
+                    {
+                        var beforeCollate = trimmedPart.Substring(0, collateIndex).Trim();
+                        var afterCollate = trimmedPart.Substring(collateIndex);
+                        var nextSpaceIndex = afterCollate.IndexOf(' ', 9); // 9 = " COLLATE ".Length
+                        if (nextSpaceIndex > 0)
+                        {
+                            trimmedPart = beforeCollate + afterCollate.Substring(nextSpaceIndex);
+                        }
+                        else
+                        {
+                            trimmedPart = beforeCollate;
+                        }
+                    }
+                    
+                    // 确定排序方向
+                    var direction = SortDirection.Ascending;
+                    var columnName = trimmedPart;
+                    
+                    if (trimmedPart.EndsWith(" DESC", StringComparison.OrdinalIgnoreCase))
+                    {
+                        direction = SortDirection.Descending;
+                        columnName = trimmedPart.Substring(0, trimmedPart.Length - 5).Trim();
+                    }
+                    else if (trimmedPart.EndsWith(" ASC", StringComparison.OrdinalIgnoreCase))
+                    {
+                        direction = SortDirection.Ascending;
+                        columnName = trimmedPart.Substring(0, trimmedPart.Length - 4).Trim();
+                    }
+                    
+                    // 移除方括号
+                    columnName = columnName.Trim('[', ']');
+                    
+                    if (!string.IsNullOrWhiteSpace(columnName))
+                    {
+                        sortColumns.Add((columnName, direction));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"解析ORDER BY子句时出错: {ex.Message}");
+            }
+            
+            return sortColumns;
+        }
+
+        private string ExtractTableNameFromSql(string sql)
+        {
+            try
+            {
+                var fromIndex = sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
+                if (fromIndex == -1) return "";
+
+                var fromSubstring = sql.Substring(fromIndex + 4).Trim();
+                
+                // 移除可能的ORDER BY子句
+                var orderByIndex = fromSubstring.IndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
+                if (orderByIndex != -1)
+                {
+                    fromSubstring = fromSubstring.Substring(0, orderByIndex).Trim();
+                }
+
+                // 移除方括号并获取表名
+                var tableName = fromSubstring.Split(' ').FirstOrDefault()?.Trim('[', ']') ?? "";
+                return tableName;
+            }
+            catch
+            {
+                return "";
+            }
         }
     }
 }

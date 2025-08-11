@@ -1,4 +1,7 @@
-﻿using System.Windows;
+﻿using Microsoft.Extensions.DependencyInjection;
+using SqlToExcel.Services;
+using SqlToExcel.ViewModels;
+using System.Windows;
 
 namespace SqlToExcel;
 
@@ -7,19 +10,35 @@ namespace SqlToExcel;
 /// </summary>
 public partial class App : Application
 {
-    public void UpdateTheme(string skin)
-    {
-        var dictionaries = Application.Current.Resources.MergedDictionaries;
-        var oldSkin = dictionaries.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Skin"));
-        if (oldSkin != null)
-        {
-            dictionaries.Remove(oldSkin);
-        }
+    public static ServiceProvider ServiceProvider { get; private set; } = null!;
 
-        var newSkin = new ResourceDictionary
-        {
-            Source = new Uri($"pack://application:,,,/HandyControl;component/Themes/Skin{skin}.xaml", UriKind.Absolute)
-        };
-        dictionaries.Add(newSkin);
+    public App()
+    {
+        var serviceCollection = new ServiceCollection();
+        ConfigureServices(serviceCollection);
+        ServiceProvider = serviceCollection.BuildServiceProvider();
+    }
+
+    private void ConfigureServices(IServiceCollection services)
+    {
+        services.AddSingleton<ThemeService>();
+        services.AddSingleton<ExcelExportService>();
+        services.AddSingleton<MainViewModel>();
+        services.AddSingleton<BatchExportViewModel>();
+        services.AddSingleton<MainWindow>();
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        // Initialize database first
+        DatabaseService.Instance.Initialize();
+
+        var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+        var mainViewModel = ServiceProvider.GetRequiredService<MainViewModel>();
+        mainWindow.DataContext = mainViewModel;
+        mainWindow.Loaded += (sender, args) => mainViewModel.CheckDatabaseConfiguration();
+        mainWindow.Show();
     }
 }

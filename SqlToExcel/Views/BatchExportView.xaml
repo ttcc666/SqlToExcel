@@ -7,16 +7,57 @@
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
-        <DataGrid ItemsSource="{Binding Items}" AutoGenerateColumns="False" IsReadOnly="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <ToolBar Grid.Row="0">
+            <Button Content="导出配置" Command="{Binding ExportConfigsCommand}" ToolTip="将所有配置导出到一个JSON文件"/>
+            <Separator/>
+            <Button Content="全选" Command="{Binding SelectAllCommand}" ToolTip="选择所有配置"/>
+            <Button Content="取消全选" Command="{Binding ClearSelectionCommand}" ToolTip="取消选择所有配置"/>
+            <Separator/>
+            <Button Content="批量导出" Command="{Binding BatchExportCommand}" ToolTip="批量导出选中的配置到指定文件夹"
+                    Style="{StaticResource ButtonPrimary}"/>
+            <TextBlock Text="{Binding SelectedCountText}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+        </ToolBar>
+
+        <DataGrid Grid.Row="1" ItemsSource="{Binding Items}" AutoGenerateColumns="False" IsReadOnly="False" x:Name="dataGrid">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Key" Binding="{Binding Key}" Width="Auto"/>
-                <DataGridTextColumn Header="Source Description" Binding="{Binding SourceDescription}" Width="*"/>
-                <DataGridTextColumn Header="Target Description" Binding="{Binding TargetDescription}" Width="*"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="150"/>
-                <DataGridTemplateColumn Header="Actions" Width="100">
+                <DataGridTemplateColumn Header="选择" Width="60">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Button Content="Export" Command="{Binding ExportCommand}" Style="{StaticResource ButtonPrimary}"/>
+                            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="键" Binding="{Binding Key}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="源描述" Binding="{Binding SourceDescription}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="目标描述" Binding="{Binding TargetDescription}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="*" IsReadOnly="True"/>
+                <DataGridTemplateColumn Header="操作" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="预览"
+                                        Command="{Binding DataContext.PreviewCommand, ElementName=dataGrid}"
+                                        CommandParameter="{Binding}"
+                                        Style="{StaticResource ButtonInfo}" Margin="0,0,5,0"/>
+                                <Button Content="导出"
+                                        Command="{Binding DataContext.ExportCommand, ElementName=dataGrid}"
+                                        CommandParameter="{Binding}"
+                                        Style="{StaticResource ButtonPrimary}" Margin="0,0,5,0"/>
+                                <Button Content="编辑"
+                                        Command="{Binding DataContext.EditCommand, ElementName=dataGrid}"
+                                        CommandParameter="{Binding}"
+                                        Style="{StaticResource ButtonInfo}" Margin="0,0,5,0"/>
+                                <Button Content="删除"
+                                        Command="{Binding DataContext.DeleteCommand, ElementName=dataGrid}"
+                                        CommandParameter="{Binding}"
+                                        Style="{StaticResource ButtonDanger}"/>
+                            </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

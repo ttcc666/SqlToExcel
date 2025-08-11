@@ -1,4 +1,9 @@
 using SqlSugar;
+using SqlToExcel.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 
 namespace SqlToExcel.Services
 {
@@ -6,8 +11,10 @@ namespace SqlToExcel.Services
     {
         private static readonly Lazy<DatabaseService> _instance = new Lazy<DatabaseService>(() => new DatabaseService());
         public static DatabaseService Instance => _instance.Value;
+        private const string LocalDbFileName = "config.db";
 
         public SqlSugarScope? Db { get; private set; }
+        public ISqlSugarClient? LocalDb => Db?.GetConnection("local");
 
         private DatabaseService()
         { }
@@ -21,33 +28,50 @@ namespace SqlToExcel.Services
 
         public bool Initialize()
         {
-            if (!IsConfigured())
+            var connectionConfigs = new List<ConnectionConfig>();
+
+            // Always add local SQLite DB for configs
+            connectionConfigs.Add(new ConnectionConfig()
             {
-                Db = null;
-                return true;
+                ConfigId = "local",
+                ConnectionString = $"DataSource={LocalDbFileName}",
+                DbType = DbType.Sqlite,
+                IsAutoCloseConnection = true
+            });
+
+            // Add source and target if configured
+            if (IsConfigured())
+            {
+                connectionConfigs.Add(new ConnectionConfig()
+                {
+                    ConfigId = "source",
+                    ConnectionString = Properties.Settings.Default.SourceConnectionString,
+                    DbType = DbType.SqlServer,
+                    IsAutoCloseConnection = true
+                });
+                connectionConfigs.Add(new ConnectionConfig()
+                {
+                    ConfigId = "target",
+                    ConnectionString = Properties.Settings.Default.TargetConnectionString,
+                    DbType = DbType.SqlServer,
+                    IsAutoCloseConnection = true
+                });
             }
 
-            var sourceConn = new ConnectionConfig()
+            try
             {
-                ConfigId = "source",
-                ConnectionString = Properties.Settings.Default.SourceConnectionString,
-                DbType = DbType.SqlServer,
-                IsAutoCloseConnection = true
-            };
+                Db = new SqlSugarScope(connectionConfigs);
 
-            var targetConn = new ConnectionConfig()
-            {
-                ConfigId = "target",
-                ConnectionString = Properties.Settings.Default.TargetConnectionString,
-                DbType = DbType.SqlServer,
-                IsAutoCloseConnection = true
-            };
+                // Initialize config table
+                LocalDb?.CodeFirst.InitTables<BatchExportConfigEntity>();
+                LocalDb?.CodeFirst.InitTables<TableMapping>();
 
-                        try
-            {
-                Db = new SqlSugarScope(new List<ConnectionConfig> { sourceConn, targetConn });
-                Db.GetConnection("source").Ado.IsValidConnection();
-                Db.GetConnection("target").Ado.IsValidConnection();
+                // Validate source/target connections if they exist
+                if (IsConfigured())
+                {
+                    Db.GetConnection("source").Ado.IsValidConnection();
+                    Db.GetConnection("target").Ado.IsValidConnection();
+                }
                 return true;
             }
             catch (Exception)
@@ -83,6 +107,110 @@ namespace SqlToExcel.Services
                 throw new InvalidOperationException("数据库连接未初始化。");
             }
             return Db.GetConnection(dbKey.ToLower());
+        }
+
+        public Dictionary<string, string> GetFieldTypesInfo(string dbKey, string tableName, List<string> fieldNames)
+        {
+            var db = GetDbConnection(dbKey);
+            var columns = db?.DbMaintenance.GetColumnInfosByTableName(tableName, false);
+            
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            
+            if (columns == null)
+            {
+                foreach (var fieldName in fieldNames)
+                {
+                    result[fieldName] = "表不存在";
+                }
+                return result;
+            }
+
+            foreach (var fieldName in fieldNames)
+            {
+                var column = columns.FirstOrDefault(c =>
+                    c.DbColumnName.Equals(fieldName, StringComparison.OrdinalIgnoreCase));
+                
+                if (column != null)
+                {
+                    string fullType = BuildFullTypeString(column);
+                    result[fieldName] = fullType;
+                }
+                else
+                {
+                    result[fieldName] = "字段不存在";
+                }
+            }
+            return result;
+        }
+
+        private string BuildFullTypeString(DbColumnInfo column)
+        {
+            string baseType = column.DataType.ToLower();
+            
+            // 处理字符串类型
+            if (baseType.Contains("varchar"))
+            {
+                if (column.Length == -1)
+                    return $"{column.DataType}(MAX)";
+                else if (column.Length > 0)
+                    return $"{column.DataType}({column.Length})";
+                else
+                    return column.DataType;
+            }
+            else if (baseType.Contains("nvarchar"))
+            {
+                if (column.Length == -1)
+                    return $"{column.DataType}(MAX)";
+                else if (column.Length > 0)
+                    return $"{column.DataType}({column.Length / 2})"; // nvarchar长度需要除以2
+                else
+                    return column.DataType;
+            }
+            else if (baseType.Contains("char") || baseType.Contains("nchar"))
+            {
+                return column.Length > 0 ? $"{column.DataType}({column.Length})" : column.DataType;
+            }
+            // 处理数值类型
+            else if (baseType.Contains("decimal") || baseType.Contains("numeric"))
+            {
+                if (column.DecimalDigits > 0 || column.Scale > 0)
+                    return $"{column.DataType}({column.DecimalDigits},{column.Scale})";
+                else
+                    return column.DataType;
+            }
+            else if (baseType.Contains("float"))
+            {
+                return column.Length > 0 ? $"{column.DataType}({column.Length})" : column.DataType;
+            }
+            // 处理二进制类型
+            else if (baseType.Contains("binary") || baseType.Contains("varbinary"))
+            {
+                if (column.Length == -1)
+                    return $"{column.DataType}(MAX)";
+                else if (column.Length > 0)
+                    return $"{column.DataType}({column.Length})";
+                else
+                    return column.DataType;
+            }
+            // 其他类型直接返回
+            else
+            {
+                return column.DataType;
+            }
+        }
+
+        public bool IsTableExistsInTarget(string tableName)
+        {
+            try
+            {
+                var db = GetDbConnection("target");
+                var tables = db?.DbMaintenance.GetTableInfoList(false);
+                return tables?.Any(t => t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase)) ?? false;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

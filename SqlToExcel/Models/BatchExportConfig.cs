@@ -10,6 +10,7 @@ namespace SqlToExcel.Models
     public class QueryConfig
     {
         public string SheetName { get; set; } = null!;
+        public string? TableName { get; set; }
         public string Sql { get; set; } = null!;
         public string Description { get; set; } = null!;
     }

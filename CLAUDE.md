@@ -11,36 +11,39 @@ To build and run the application, use the following commands from the root direc
 
 ## Architecture
 
-This is a .NET WPF application designed to connect to two separate SQL databases, execute queries against them, and export the results into a single Excel file. The application allows for both automatic SQL generation and manual query editing. A key feature is the automatic mapping of tables between the source and target databases, configured via `table_mappings.json`.
+This is a .NET WPF application designed to connect to two separate SQL databases, execute queries, and export the results into a single Excel file. The application supports both manual query editing and dynamic SQL generation based on table/column selection.
 
-The project follows the MVVM (Model-View-ViewModel) design pattern:
+The project follows the MVVM (Model-View-ViewModel) design pattern and utilizes dependency injection, configured in `App.xaml.cs`, to manage services and view models.
 
-- **Views**: Contains the WPF windows and user controls (`.xaml` files).
-  - `MainWindow.xaml`: The main application window, hosting the dual query views.
-  - `DatabaseConfigView.xaml`: A view for configuring the source and target database connections.
-  - `PreviewView.xaml`: A view for previewing a single query result.
-  - `DualPreviewView.xaml`: A view for previewing the results of both queries side-by-side.
-  - `ColumnSelectorView.xaml`: A dialog for selecting tables and columns to dynamically generate `SELECT` statements.
-  - `ColumnSortView.xaml`: A dialog for defining the `ORDER BY` clause for a query.
-- **ViewModels**: Contains the presentation logic for the views.
-  - `MainViewModel.cs`: The main view model, managing the two database contexts and coordinating the UI. It handles loading tables and columns, generating SQL queries, and orchestrating previews and exports.
-  - `DatabaseConfigViewModel.cs`: The view model for the database configuration view.
-  - `PreviewViewModel.cs`: The view model for the single query preview.
-  - `DualPreviewViewModel.cs`: The view model for the dual query preview.
-  - `ColumnSelectorViewModel.cs`: The view model for the column selection dialog.
-  - `ColumnSortViewModel.cs`: The view model for the column sorting dialog.
-  - `RelayCommand.cs`: A generic `ICommand` implementation for MVVM.
-- **Services**: Contains the core business logic.
-  - `DatabaseService.cs`: Handles database connections and executing queries using `SqlSugarCore`. It manages two database contexts: "source" and "target".
-  - `ExcelExportService.cs`: Handles exporting data from both queries into a single Excel file using `EPPlus`.
+- **Views**: Contains the WPF windows and user controls (`.xaml` files) that define the UI.
+  - `MainWindow.xaml`: The main application window.
+  - `DatabaseConfigView.xaml`: For configuring database connections.
+  - `PreviewView.xaml` & `DualPreviewView.xaml`: For previewing query results.
+  - `ColumnSelectorView.xaml`: A dialog for selecting columns to generate `SELECT` statements.
+  - `ColumnSortView.xaml`: A dialog for defining the `ORDER BY` clause.
+  - `BatchExportView.xaml`: A view for managing and executing batch export configurations.
+
+- **ViewModels**: Contains the presentation logic and state for the views.
+  - `MainViewModel.cs`: The primary view model, coordinating UI logic, database interactions, previews, and single exports.
+  - `BatchExportViewModel.cs`: Manages the logic for the batch export feature, loading and saving configurations from `batch_export_configs.json`.
+  - Other view models correspond to their respective views (`DatabaseConfigViewModel`, `PreviewViewModel`, etc.).
+
+- **Services**: Contains the core business logic, decoupled from the UI.
+  - `DatabaseService.cs`: Manages database connections for source and target databases using `SqlSugarCore`. It handles fetching schema information (tables, columns) and executing queries.
+  - `ExcelExportService.cs`: Handles the logic for exporting `DataTable` objects into formatted Excel files using `EPPlus`.
+  - `ThemeService.cs`: Manages dynamic theme switching between light ("Default") and dark ("Dark") modes.
+
+- **Configuration Files**:
+  - `table_mappings.json`: Configures default table-to-table mappings between the source and target databases to streamline selection.
+  - `batch_export_configs.json`: Stores saved configurations for the batch export feature.
 
 ### Key Libraries
 
 - **HandyControl**: A UI library providing modern controls for WPF.
-- **SqlSugarCore**: Used as an ORM to interact with the SQL databases.
-- **EPPlus**: Used to generate Excel files from the query results.
-- **Microsoft.Data.SqlClient**: The ADO.NET provider for SQL Server.
+- **SqlSugarCore**: An ORM used for database interaction.
+- **EPPlus**: A library for creating and manipulating Excel files.
+- **Microsoft.Extensions.DependencyInjection**: Used for setting up dependency injection.
 
 ## Theme Switching
 
-The application uses a custom theme switching mechanism located in `App.xaml.cs`. The `UpdateTheme` method takes a skin name ("Dark" or "Default") and switches the application's theme by replacing the skin's `ResourceDictionary` in the application's merged dictionaries. This allows for dynamic changing between light and dark modes, triggered from the `MainViewModel`.
+The application supports dynamic theme switching, managed by the `ThemeService`. The `MainViewModel` invokes this service to change the theme between "Dark" and "Default" skins. The service updates the application's merged resource dictionaries to apply the new theme globally.
