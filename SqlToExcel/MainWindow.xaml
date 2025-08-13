@@ -27,6 +27,7 @@
             </MenuItem>
             <MenuItem Header="_工具">
                 <MenuItem Header="_字段类型提取" Click="OpenFieldTypeExtractor_Click" />
+                <MenuItem Header="_字段对比" Click="OpenFieldComparison_Click" />
             </MenuItem>
         </Menu>
 
@@ -123,6 +124,9 @@
             </TabItem>
             <TabItem Header="表映射配置">
                 <views:TableMappingView/>
+            </TabItem>
+            <TabItem Header="对比报表">
+                <views:ComparisonReportView/>
             </TabItem>
         </TabControl>
 

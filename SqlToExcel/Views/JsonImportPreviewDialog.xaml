@@ -1,0 +1,56 @@
+<hc:BlurWindow x:Class="SqlToExcel.Views.JsonImportPreviewDialog"
+               xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+               xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+               xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+               xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+               xmlns:hc="https://handyorg.github.io/handycontrol"
+               mc:Ignorable="d"
+               Title="导入配置预览与验证" Width="600" Height="500"
+               WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <hc:Card Header="字段映射对比">
+            <DataGrid ItemsSource="{Binding FieldMappings}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding OldField}" Value="(无)">
+                                <Setter Property="Background" Value="#FFEBEE"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding NewField}" Value="(无)">
+                                <Setter Property="Background" Value="#FFEBEE"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="源字段 (Old Fields)" Binding="{Binding OldField}" Width="*"/>
+                    <DataGridTextColumn Header="目标字段 (New Fields)" Binding="{Binding NewField}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </hc:Card>
+
+        <TextBlock Grid.Row="1" Text="{Binding MismatchMessage}"
+                   Foreground="{DynamicResource DangerBrush}"
+                   FontWeight="Bold"
+                   Margin="0,10,0,0"
+                   Visibility="{Binding IsFieldCountMismatched, Converter={StaticResource BooleanToVisibilityConverter}}"
+                   TextWrapping="Wrap"/>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="确认导入" IsDefault="True" Click="ConfirmButton_Click" Style="{StaticResource ButtonPrimary}"/>
+            <Button Content="取消" IsCancel="True" Margin="10,0,0,0"/>
+        </StackPanel>
+    </Grid>
+</hc:BlurWindow>

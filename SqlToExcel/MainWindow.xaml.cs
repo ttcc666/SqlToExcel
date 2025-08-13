@@ -20,5 +20,12 @@ namespace SqlToExcel
             fieldTypeExtractorWindow.Owner = this;
             fieldTypeExtractorWindow.ShowDialog();
         }
+
+        private void OpenFieldComparison_Click(object sender, RoutedEventArgs e)
+        {
+            var fieldComparisonView = new FieldComparisonView();
+            fieldComparisonView.Owner = this;
+            fieldComparisonView.ShowDialog();
+        }
     }
 }

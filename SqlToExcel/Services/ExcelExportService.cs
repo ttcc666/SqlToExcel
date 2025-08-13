@@ -204,9 +204,9 @@ namespace SqlToExcel.Services
                                 }
                             }
                         }
-                        else if (sheet.Value is IEnumerable<object> collection)
+                        else if (sheet.Value is System.Collections.IEnumerable collection && !(sheet.Value is string))
                         {
-                            var list = collection.ToList();
+                            var list = collection.Cast<object>().ToList();
                             if (list.Any())
                             {
                                 var itemType = list.First().GetType();
@@ -215,7 +215,19 @@ namespace SqlToExcel.Services
                                 // Header
                                 for (int i = 0; i < properties.Length; i++)
                                 {
-                                    worksheet.Cells[1, i + 1].Value = properties[i].Name;
+                                    // 自定义表头名称
+                                    if (itemType == typeof(ComparisonResultItem) && properties[i].Name == "IsInJson")
+                                    {
+                                        worksheet.Cells[1, i + 1].Value = "JSON 状态";
+                                    }
+                                    else if (itemType == typeof(ComparisonResultItem) && properties[i].Name == "FieldName")
+                                    {
+                                        worksheet.Cells[1, i + 1].Value = "数据库字段名";
+                                    }
+                                    else
+                                    {
+                                        worksheet.Cells[1, i + 1].Value = properties[i].Name;
+                                    }
                                 }
 
                                 // Data
@@ -224,8 +236,30 @@ namespace SqlToExcel.Services
                                     for (int j = 0; j < properties.Length; j++)
                                     {
                                         var cell = worksheet.Cells[i + 2, j + 1];
-                                        cell.Value = properties[j].GetValue(list[i])?.ToString();
+                                        object cellValue = properties[j].GetValue(list[i]);
+
+                                        // 特殊处理 ComparisonResultItem 的 IsInJson 属性
+                                        if (itemType == typeof(ComparisonResultItem) && properties[j].Name == "IsInJson")
+                                        {
+                                            cell.Value = (bool)cellValue ? "✓" : "✗";
+                                        }
+                                        else
+                                        {
+                                            cell.Value = cellValue?.ToString();
+                                        }
                                         cell.Style.Numberformat.Format = "@";
+                                    }
+
+                                    // 条件格式化：如果为 ComparisonResultItem 且 IsInJson 为 false，则整行标红
+                                    if (itemType == typeof(ComparisonResultItem))
+                                    {
+                                        var item = (ComparisonResultItem)list[i];
+                                        if (!item.IsInJson)
+                                        {
+                                            var rowRange = worksheet.Cells[i + 2, 1, i + 2, properties.Length];
+                                            rowRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                                            rowRange.Style.Fill.BackgroundColor.SetColor(ColorTranslator.FromHtml("#FFCDD2"));
+                                        }
                                     }
                                 }
                             }
@@ -249,13 +283,8 @@ namespace SqlToExcel.Services
                         // 优化的列宽计算逻辑
                         for (int i = 1; i <= dataRange.End.Column; i++)
                         {
-                            // 获取表头文字
                             var headerText = worksheet.Cells[1, i].Text;
-                            
-                            // 计算列宽（考虑中文字符）
                             double calculatedWidth = CalculateColumnWidth(headerText);
-                            
-                            // 检查数据内容，取最大宽度（可选，限制前100行以提高性能）
                             int maxRows = Math.Min(100, dataRange.End.Row);
                             for (int row = 2; row <= maxRows; row++)
                             {
@@ -266,38 +295,53 @@ namespace SqlToExcel.Services
                                     calculatedWidth = Math.Max(calculatedWidth, cellWidth);
                                 }
                             }
-                            
-                            // 设置列宽，最小10，最大50
                             worksheet.Column(i).Width = Math.Min(Math.Max(calculatedWidth * 1.2, 10), 50);
                         }
 
-                        // 设置固定行高（约3行文字的高度）
-                        // 表头行稍微高一点
                         worksheet.Row(1).Height = 25;
-                        
-                        // 数据行设置固定高度
                         for (int row = 2; row <= dataRange.End.Row; row++)
                         {
-                            worksheet.Row(row).Height = 45; // 约3行文字的高度
+                            worksheet.Row(row).Height = 20;
                         }
 
-                        // 禁用自动换行，改为使用垂直居中
-                        worksheet.Cells[dataRange.Address].Style.WrapText = false;
                         worksheet.Cells[dataRange.Address].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
-                        
-                        // 设置水平对齐（可选：数字右对齐，文本左对齐）
                         for (int row = 2; row <= dataRange.End.Row; row++)
                         {
                             for (int col = 1; col <= dataRange.End.Column; col++)
                             {
-                                var cell = worksheet.Cells[row, col];
-                                // 保持文本格式，但设置对齐方式
-                                cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
+                                worksheet.Cells[row, col].Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
                             }
                         }
                     }
                     package.Save();
                 }
+            }
+        }
+
+        public void ExportComparisonResults(IEnumerable<TableComparisonResultViewModel> results)
+        {
+            try
+            {
+                var sheets = new Dictionary<string, object>();
+                foreach (var result in results)
+                {
+                    // 注意：这里不再转换为匿名对象，而是直接传递原始集合
+                    // SaveSheetsToFile 方法将需要被修改以处理这种特定类型
+                    sheets[result.TableName] = result.ComparisonResults;
+                }
+
+                if (!sheets.Any())
+                {
+                    MessageBox.Show("没有可导出的数据。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                SaveSheetsToFile(sheets, $"FieldComparison_{DateTime.Now:yyyyMMdd}.xlsx");
+                MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"导出过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

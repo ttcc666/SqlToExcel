@@ -65,6 +65,7 @@ namespace SqlToExcel.Services
                 // Initialize config table
                 LocalDb?.CodeFirst.InitTables<BatchExportConfigEntity>();
                 LocalDb?.CodeFirst.InitTables<TableMapping>();
+                LocalDb?.CodeFirst.InitTables<ComparisonReport>();
 
                 // Validate source/target connections if they exist
                 if (IsConfigured())
@@ -199,6 +200,20 @@ namespace SqlToExcel.Services
             }
         }
 
+        public bool IsTableExists(string dbKey, string tableName)
+        {
+            try
+            {
+                var db = GetDbConnection(dbKey);
+                var tables = db?.DbMaintenance.GetTableInfoList(false);
+                return tables?.Any(t => t.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase)) ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public bool IsTableExistsInTarget(string tableName)
         {
             try
@@ -211,6 +226,24 @@ namespace SqlToExcel.Services
             {
                 return false;
             }
+        }
+
+        public async System.Threading.Tasks.Task SaveComparisonReportAsync(ComparisonReport report)
+        {
+            if (LocalDb == null) throw new InvalidOperationException("本地数据库未初始化。");
+            await LocalDb.Storageable(report).ExecuteCommandAsync();
+        }
+
+        public async System.Threading.Tasks.Task<System.Collections.Generic.List<ComparisonReport>> GetComparisonReportsAsync()
+        {
+            if (LocalDb == null) throw new InvalidOperationException("本地数据库未初始化。");
+            return await LocalDb.Queryable<ComparisonReport>().OrderBy(r => r.ComparisonDate, OrderByType.Desc).ToListAsync();
+        }
+
+        public async System.Threading.Tasks.Task DeleteComparisonReportsAsync(System.Collections.Generic.IEnumerable<string> tableNames)
+        {
+            if (LocalDb == null) throw new InvalidOperationException("本地数据库未初始化。");
+            await LocalDb.Deleteable<ComparisonReport>().In(tableNames).ExecuteCommandAsync();
         }
     }
 }

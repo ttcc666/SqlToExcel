@@ -1,0 +1,101 @@
+<UserControl x:Class="SqlToExcel.Views.ComparisonReportView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:hc="https://handyorg.github.io/handycontrol"
+             xmlns:viewModels="clr-namespace:SqlToExcel.ViewModels"
+             xmlns:converters="clr-namespace:SqlToExcel.Converters"
+             mc:Ignorable="d" 
+             d:DataContext="{d:DesignInstance viewModels:ComparisonReportViewModel}"
+             d:DesignHeight="600" d:DesignWidth="800">
+    <UserControl.Resources>
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+    </UserControl.Resources>
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <Button Content="刷新" Command="{Binding RefreshCommand}" Style="{StaticResource ButtonPrimary}" hc:IconElement.Geometry="{StaticResource App.Refresh}"/>
+            <Button Content="导出全部报告" Command="{Binding ExportCommand}" Style="{StaticResource ButtonSuccess}" Margin="10,0,0,0" hc:IconElement.Geometry="{StaticResource App.MicrosoftExcel}"/>
+            <Button Content="删除选中报告" Command="{Binding DeleteSelectedCommand}" CommandParameter="{Binding ElementName=ReportsDataGrid, Path=SelectedItems}" Style="{StaticResource ButtonDanger}" Margin="10,0,0,0" hc:IconElement.Geometry="{StaticResource App.Refresh}"/>
+            <hc:LoadingLine Grid.Row="0" DotCount="5" Margin="20,0,0,0" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="300"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="1.5*"/>
+            </Grid.ColumnDefinitions>
+
+            <hc:Card Header="差异报告列表">
+                <DataGrid x:Name="ReportsDataGrid" ItemsSource="{Binding Reports}" SelectedItem="{Binding SelectedReport}" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Extended">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="表名" Binding="{Binding TableName}" Width="*"/>
+                        <DataGridTextColumn Header="JSON独有" Binding="{Binding JsonOnlyCount}" Width="Auto"/>
+                        <DataGridTextColumn Header="DB独有" Binding="{Binding DbOnlyCount}" Width="Auto"/>
+                        <DataGridTextColumn Header="对比时间" Binding="{Binding ComparisonDate, StringFormat='yyyy-MM-dd HH:mm'}" Width="Auto"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </hc:Card>
+
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"/>
+
+            <hc:Card Grid.Column="2" Header="字段详情" Visibility="{Binding SelectedReport, Converter={StaticResource NullToVisibilityConverter}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
+                <DataGrid ItemsSource="{Binding DetailedResults}" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="None" RowHeaderWidth="0" BorderThickness="0">
+                    <DataGrid.CellStyle>
+                        <Style TargetType="DataGridCell">
+                            <Setter Property="Padding" Value="10, 8"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                        </Style>
+                    </DataGrid.CellStyle>
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsInJson}" Value="False">
+                                    <Setter Property="Background" Value="#FFCDD2"/>
+                                </DataTrigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#E8F5FF"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="数据库字段名" Binding="{Binding FieldName}" Width="*"/>
+                        <DataGridTemplateColumn Header="JSON 状态" Width="120">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="18" FontWeight="Bold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsInJson}" Value="True">
+                                                        <Setter Property="Text" Value="✓"/>
+                                                        <Setter Property="Foreground" Value="#28A745"/>
+                                                        <Setter Property="ToolTip" Value="存在于JSON中"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsInJson}" Value="False">
+                                                        <Setter Property="Text" Value="✗"/>
+                                                        <Setter Property="Foreground" Value="#DC3545"/>
+                                                        <Setter Property="ToolTip" Value="在JSON中缺失"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </hc:Card>
+        </Grid>
+    </Grid>
+</UserControl>

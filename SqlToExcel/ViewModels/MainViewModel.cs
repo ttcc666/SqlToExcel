@@ -612,91 +612,82 @@ namespace SqlToExcel.ViewModels
         private async Task ImportJsonAsync()
         {
             var importViewModel = new ImportJsonViewModel();
-            var importDialog = new ImportJsonDialog
-            {
-                DataContext = importViewModel,
-                Owner = Application.Current.MainWindow
-            };
 
-            if (importDialog.ShowDialog() == true && !string.IsNullOrEmpty(importViewModel.ResultJson))
+            while (true)
             {
+                var importDialog = new ImportJsonDialog
+                {
+                    DataContext = importViewModel,
+                    Owner = Application.Current.MainWindow
+                };
+
+                if (importDialog.ShowDialog() != true || string.IsNullOrEmpty(importViewModel.ResultJson))
+                {
+                    // 用户在第一个对话框（输入JSON）处取消，完全退出流程
+                    break;
+                }
+
                 try
                 {
-                    StatusMessage = "正在应用JSON配置...";
+                    StatusMessage = "正在解析JSON配置...";
                     var mapping = JsonSerializer.Deserialize<JsonMapping>(importViewModel.ResultJson);
 
-                    if (mapping == null || string.IsNullOrEmpty(mapping.old_table) || string.IsNullOrEmpty(mapping.new_table))
+                    if (mapping == null || mapping.old_fields == null || mapping.new_fields == null)
                     {
-                        throw new Exception("JSON内容无效或缺少必要的表信息。");
+                        MessageBox.Show("JSON内容无效或缺少 'old_fields' / 'new_fields'。请修改后重试。", "解析错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        continue; // 返回JSON输入界面
+                    }
+
+                    var previewViewModel = new JsonImportPreviewViewModel(mapping.old_fields, mapping.new_fields);
+                    var previewDialog = new JsonImportPreviewDialog
+                    {
+                        DataContext = previewViewModel,
+                        Owner = Application.Current.MainWindow
+                    };
+
+                    if (previewDialog.ShowDialog() != true)
+                    {
+                        StatusMessage = "已取消预览，请重新输入或修改JSON。";
+                        // 用户在第二个对话框（预览）处取消，返回JSON输入界面
+                        continue;
+                    }
+
+                    // 用户确认导入，开始应用配置
+                    StatusMessage = "正在应用JSON配置...";
+
+                    if (string.IsNullOrEmpty(mapping.old_table) || string.IsNullOrEmpty(mapping.new_table))
+                    {
+                        MessageBox.Show("JSON内容缺少必要的表信息。请修改后重试。", "配置错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        continue; // 返回JSON输入界面
                     }
 
                     var sourceTable = Tables1.FirstOrDefault(t => t.Name.Equals(mapping.old_table, StringComparison.OrdinalIgnoreCase));
                     var targetTable = Tables2.FirstOrDefault(t => t.Name.Equals(mapping.new_table, StringComparison.OrdinalIgnoreCase));
 
-                    if (sourceTable == null) throw new Exception($"在源数据库中找不到表: {mapping.old_table}");
-                    if (targetTable == null) throw new Exception($"在目标数据库中找不到表: {mapping.new_table}");
+                    if (sourceTable == null) { MessageBox.Show($"在源数据库中找不到表: {mapping.old_table}", "错误", MessageBoxButton.OK, MessageBoxImage.Error); continue; }
+                    if (targetTable == null) { MessageBox.Show($"在目标数据库中找不到表: {mapping.new_table}", "错误", MessageBoxButton.OK, MessageBoxImage.Error); continue; }
 
                     SelectedTable1 = sourceTable;
                     SelectedTable2 = targetTable;
 
-                    // Source Columns
+                    var columnsForSql1 = new List<string>();
                     _selectedColumnNames1.Clear();
                     Columns1.ToList().ForEach(c => c.IsSelected = false);
-                    var columnsForSql1 = new List<string>();
-                    var sourceColumnCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                     foreach (var colName in mapping.old_fields)
                     {
                         var col = Columns1.FirstOrDefault(c => c.Column.DbColumnName.Equals(colName, StringComparison.OrdinalIgnoreCase));
-                        if (col == null)
-                        {
-                            columnsForSql1.Add($"NULL AS [{colName}]");
-                        }
-                        else
-                        {
-                            col.IsSelected = true;
-                            _selectedColumnNames1.Add(col.Column.DbColumnName);
-
-                            if (sourceColumnCounts.ContainsKey(colName))
-                            {
-                                sourceColumnCounts[colName]++;
-                                columnsForSql1.Add($"[{col.Column.DbColumnName}] AS [{colName}{sourceColumnCounts[colName]}]");
-                            }
-                            else
-                            {
-                                sourceColumnCounts[colName] = 1;
-                                columnsForSql1.Add($"[{col.Column.DbColumnName}]");
-                            }
-                        }
+                        if (col != null) { col.IsSelected = true; _selectedColumnNames1.Add(col.Column.DbColumnName); }
+                        columnsForSql1.Add(col != null ? $"[{col.Column.DbColumnName}]" : $"NULL AS [{colName}]");
                     }
 
-                    // Target Columns
+                    var columnsForSql2 = new List<string>();
                     _selectedColumnNames2.Clear();
                     Columns2.ToList().ForEach(c => c.IsSelected = false);
-                    var columnsForSql2 = new List<string>();
-                    var targetColumnCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                     foreach (var colName in mapping.new_fields)
                     {
                         var col = Columns2.FirstOrDefault(c => c.Column.DbColumnName.Equals(colName, StringComparison.OrdinalIgnoreCase));
-                        if (col == null)
-                        {
-                            columnsForSql2.Add($"NULL AS [{colName}]");
-                        }
-                        else
-                        {
-                            col.IsSelected = true;
-                            _selectedColumnNames2.Add(col.Column.DbColumnName);
-
-                            if (targetColumnCounts.ContainsKey(colName))
-                            {
-                                targetColumnCounts[colName]++;
-                                columnsForSql2.Add($"[{col.Column.DbColumnName}] AS [{colName}{targetColumnCounts[colName]}]");
-                            }
-                            else
-                            {
-                                targetColumnCounts[colName] = 1;
-                                columnsForSql2.Add($"[{col.Column.DbColumnName}]");
-                            }
-                        }
+                        if (col != null) { col.IsSelected = true; _selectedColumnNames2.Add(col.Column.DbColumnName); }
+                        columnsForSql2.Add(col != null ? $"[{col.Column.DbColumnName}]" : $"NULL AS [{colName}]");
                     }
 
                     await GenerateSqlAsync(1, columnsForSql1);
@@ -705,11 +696,13 @@ namespace SqlToExcel.ViewModels
                     IsJsonImported = true;
                     StatusMessage = "JSON配置已成功应用。";
                     MessageBox.Show("JSON配置已成功应用。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    break; // 成功应用后，退出循环
                 }
                 catch (Exception ex)
                 {
                     StatusMessage = "应用配置失败。";
-                    MessageBox.Show($"应用JSON配置时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show($"应用JSON配置时出错: {ex.Message}。请修改后重试。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    continue; // 发生任何错误都返回JSON输入界面
                 }
             }
         }

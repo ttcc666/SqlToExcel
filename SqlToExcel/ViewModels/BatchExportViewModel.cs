@@ -177,7 +177,6 @@ namespace SqlToExcel.ViewModels
                 Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"
             };
 
-            if (saveFileDialog.ShowDialog() == true)
             {
                 await _configService.ExportConfigsToJsonAsync(saveFileDialog.FileName);
             }
