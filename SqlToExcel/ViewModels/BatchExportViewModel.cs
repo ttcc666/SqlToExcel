@@ -20,6 +20,19 @@ namespace SqlToExcel.ViewModels
         public ObservableCollection<BatchExportConfigItemViewModel> Items { get; } = new();
         private readonly ExcelExportService _exportService;
         private readonly ConfigService _configService;
+        private Timer? _debounceTimer;
+
+        private bool _isBatchExporting;
+        public bool IsBatchExporting
+        {
+            get => _isBatchExporting;
+            set
+            {
+                _isBatchExporting = value;
+                OnPropertyChanged();
+                CommandManager.InvalidateRequerySuggested();
+            }
+        }
 
         public ICommand ExportCommand { get; }
         public ICommand PreviewCommand { get; }
@@ -41,18 +54,30 @@ namespace SqlToExcel.ViewModels
             PreviewCommand = new RelayCommand(async param => await PreviewAsync(param as BatchExportConfigItemViewModel), param => CanExecute(param as BatchExportConfigItemViewModel));
             DeleteCommand = new RelayCommand(async param => await DeleteAsync(param as BatchExportConfigItemViewModel), param => CanExecute(param as BatchExportConfigItemViewModel));
             EditCommand = new RelayCommand(async param => await EditAsync(param as BatchExportConfigItemViewModel), param => CanExecute(param as BatchExportConfigItemViewModel));
-            ExportConfigsCommand = new RelayCommand(async _ => await ExportConfigsAsync());
-            BatchExportCommand = new RelayCommand(async _ => await BatchExportAsync(), _ => Items.Any(x => x.IsSelected));
-            SelectAllCommand = new RelayCommand(_ => SelectAll());
-            ClearSelectionCommand = new RelayCommand(_ => ClearSelection());
+            ExportConfigsCommand = new RelayCommand(async _ => await ExportConfigsAsync(), _ => !IsBatchExporting);
+            BatchExportCommand = new RelayCommand(async _ => await BatchExportAsync(), _ => Items.Any(x => x.IsSelected) && !IsBatchExporting);
+            SelectAllCommand = new RelayCommand(_ => SelectAll(), _ => !IsBatchExporting);
+            ClearSelectionCommand = new RelayCommand(_ => ClearSelection(), _ => !IsBatchExporting);
 
             _configService.ConfigsChanged += OnConfigsChanged;
             _ = LoadConfigsAsync();
+            InitializeDebounceTimer();
+        }
+
+        private void InitializeDebounceTimer()
+        {
+            _debounceTimer = new Timer(async _ => await SaveAllConfigsCallback(), null, Timeout.Infinite, Timeout.Infinite);
+        }
+
+        private async Task SaveAllConfigsCallback()
+        {
+            var configsToSave = Items.Select(vm => vm.Config).ToList();
+            await _configService.SaveAllConfigsAsync(configsToSave);
         }
 
         private bool CanExecute(BatchExportConfigItemViewModel? item)
         {
-            return item != null && item.Status != "正在导出..." && item.Status != "正在预览...";
+            return item != null && item.Status != "正在导出..." && item.Status != "正在预览..." && !IsBatchExporting;
         }
 
         private void OnConfigsChanged(object? sender, EventArgs e)
@@ -73,8 +98,15 @@ namespace SqlToExcel.ViewModels
                 var configs = await _configService.LoadConfigsAsync();
                 if (configs != null)
                 {
-                    foreach (var config in configs)
+                    int currentIndex = 0;
+                    foreach (var config in configs.OrderBy(c => c.Prefix)) // Sort by prefix on load
                     {
+                        // Backward compatibility for old configs
+                        if (string.IsNullOrEmpty(config.Prefix))
+                        {
+                            config.Prefix = (currentIndex + 1).ToString();
+                        }
+
                         var item = new BatchExportConfigItemViewModel(config)
                         {
                             ExportCommand = this.ExportCommand,
@@ -84,6 +116,7 @@ namespace SqlToExcel.ViewModels
                         };
                         item.PropertyChanged += OnItemPropertyChanged;
                         Items.Add(item);
+                        currentIndex++;
                     }
                 }
             }
@@ -101,18 +134,25 @@ namespace SqlToExcel.ViewModels
             try
             {
                 // Build the new filename
-                int index = Items.IndexOf(item) + 1;
                 string tableName = item.Config.DataSource.TableName ?? ExtractTableName(item.Config.DataSource.Sql);
-                string fileName = $"{index}) {item.Key}-[{tableName}(Source)].xlsx";
+                string fileName = $"{item.Prefix}) {item.Key}-[{tableName}(Source)].xlsx";
 
-                await _exportService.ExportToExcelAsync(
+                bool success = await _exportService.ExportToExcelAsync(
                     item.Config.DataSource.Sql,
                     item.Config.DataSource.SheetName,
                     item.Config.DataTarget.Sql,
                     item.Config.DataTarget.SheetName,
                     item.Config.Key,
                     fileName);
-                item.Status = "成功";
+
+                if (success)
+                {
+                    item.Status = "成功";
+                }
+                else
+                {
+                    item.Status = "已取消";
+                }
             }
             catch (Exception ex)
             {
@@ -165,8 +205,19 @@ namespace SqlToExcel.ViewModels
         {
             if (item == null) return;
 
-            // 发布事件，让主界面加载配置进行编辑
-            EventService.Publish(new LoadConfigToMainViewEvent(item.Config, isEditMode: true, originalKey: item.Config.Key));
+            var editViewModel = new EditBatchSqlViewModel(item.Config);
+            var editDialog = new EditBatchSqlDialog
+            {
+                DataContext = editViewModel,
+                Owner = Application.Current.MainWindow
+            };
+
+            if (editDialog.ShowDialog() == true)
+            {
+                // The changes are saved in the viewmodel's SaveChanges method.
+                // Now, we need to trigger the auto-save for the whole list.
+                _debounceTimer?.Change(200, Timeout.Infinite); // Trigger save after a short delay
+            }
         }
 
         private async Task ExportConfigsAsync()
@@ -177,6 +228,7 @@ namespace SqlToExcel.ViewModels
                 Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"
             };
 
+            if (saveFileDialog.ShowDialog() == true)
             {
                 await _configService.ExportConfigsToJsonAsync(saveFileDialog.FileName);
             }
@@ -211,6 +263,11 @@ namespace SqlToExcel.ViewModels
             {
                 OnPropertyChanged(nameof(SelectedCountText));
             }
+            else if (e.PropertyName == nameof(BatchExportConfigItemViewModel.Prefix))
+            {
+                // Debounce the save operation
+                _debounceTimer?.Change(500, Timeout.Infinite);
+            }
         }
 
         private void SelectAll()
@@ -231,14 +288,13 @@ namespace SqlToExcel.ViewModels
 
         private async Task BatchExportAsync()
         {
-            var selectedItems = Items.Where(x => x.IsSelected).ToList();
+            var selectedItems = Items.Where(x => x.IsSelected).OrderBy(x => x.Prefix).ToList();
             if (!selectedItems.Any())
             {
                 MessageBox.Show("请先选择要导出的配置。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            // Choose target folder using SaveFileDialog as workaround
             var folderDialog = new SaveFileDialog
             {
                 Title = "选择导出文件夹 (请选择任意文件名，程序将使用该文件所在文件夹)",
@@ -256,50 +312,64 @@ namespace SqlToExcel.ViewModels
                 return;
             }
 
-            // Show progress dialog using MessageBox for now to avoid XAML issues
             var result = MessageBox.Show($"确定要批量导出选中的 {selectedItems.Count} 个配置到文件夹 {targetFolder} 吗？",
                 "确认批量导出", MessageBoxButton.YesNo, MessageBoxImage.Question);
             
             if (result != MessageBoxResult.Yes)
                 return;
 
-            // Start the export process directly
+            IsBatchExporting = true;
             try
             {
-                var configs = selectedItems.Select(x => x.Config).ToList();
-                var progressReported = 0;
-                var total = configs.Count;
-                
-                await _exportService.BatchExportToFolderAsync(configs, targetFolder,
-                    new Progress<(int current, int total, string currentItem)>(report =>
+                await Task.Run(async () =>
+                {
+                    var configs = selectedItems.Select(x => x.Config).ToList();
+                    var progress = new Progress<(int current, int total, string currentItem)>(report =>
                     {
-                        progressReported = report.current + 1;
                         Application.Current.Dispatcher.Invoke(() =>
                         {
-                            // Update status for currently processing item
                             if (report.current < selectedItems.Count)
                             {
-                                selectedItems[report.current].Status = $"正在导出... ({progressReported}/{total})";
+                                selectedItems[report.current].Status = $"正在导出... ({report.current + 1}/{report.total})";
                             }
                         });
-                    }));
-                
-                // Update status for all exported items
-                foreach (var item in selectedItems)
-                {
-                    item.Status = "导出成功";
-                }
-                
-                MessageBox.Show($"批量导出完成！已成功导出 {selectedItems.Count} 个配置到文件夹：{targetFolder}",
-                    "批量导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                    });
+
+                    if (await _exportService.BatchExportToFolderAsync(configs, targetFolder, progress))
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            foreach (var item in selectedItems)
+                            {
+                                item.Status = "导出成功";
+                            }
+                            MessageBox.Show($"批量导出完成！已成功导出 {selectedItems.Count} 个配置到文件夹：{targetFolder}", "批量导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                        });
+                    }
+                    else
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            MessageBox.Show("批量导出已完成，但部分项目导出失败。请检查输出文件夹和列表状态。", "部分失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            foreach (var item in selectedItems.Where(i => i.Status.Contains("正在导出")))
+                            {
+                                item.Status = "导出失败";
+                            }
+                        });
+                    }
+                });
             }
             catch (Exception ex)
             {
+                MessageBox.Show($"批量导出过程中发生严重错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 foreach (var item in selectedItems)
                 {
                     item.Status = "导出失败";
                 }
-                MessageBox.Show($"批量导出过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsBatchExporting = false;
             }
         }
 

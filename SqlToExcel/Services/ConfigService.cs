@@ -112,13 +112,32 @@ namespace SqlToExcel.Services
             }
         }
 
+        public async Task SaveAllConfigsAsync(IEnumerable<BatchExportConfig> configs)
+        {
+            try
+            {
+                var entities = configs.Select(MapToEntity).ToList();
+
+                await _dbService.LocalDb.Ado.UseTranAsync(async () =>
+                {
+                    await _dbService.LocalDb.Deleteable<BatchExportConfigEntity>().ExecuteCommandAsync();
+                    await _dbService.LocalDb.Insertable(entities).ExecuteCommandAsync();
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"自动保存配置到数据库时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private BatchExportConfigEntity MapToEntity(BatchExportConfig model)
         {
             return new BatchExportConfigEntity
             {
                 Key = model.Key,
                 DataSourceJson = JsonSerializer.Serialize(model.DataSource),
-                DataTargetJson = JsonSerializer.Serialize(model.DataTarget)
+                DataTargetJson = JsonSerializer.Serialize(model.DataTarget),
+                Prefix = model.Prefix
             };
         }
 
@@ -128,7 +147,8 @@ namespace SqlToExcel.Services
             {
                 Key = entity.Key,
                 DataSource = JsonSerializer.Deserialize<QueryConfig>(entity.DataSourceJson) ?? new QueryConfig(),
-                DataTarget = JsonSerializer.Deserialize<QueryConfig>(entity.DataTargetJson) ?? new QueryConfig()
+                DataTarget = JsonSerializer.Deserialize<QueryConfig>(entity.DataTargetJson) ?? new QueryConfig(),
+                Prefix = entity.Prefix
             };
         }
 

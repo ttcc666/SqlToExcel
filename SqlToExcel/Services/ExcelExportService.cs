@@ -57,7 +57,7 @@ namespace SqlToExcel.Services
             }
         }
 
-        public async Task ExportToExcelAsync(string sqlSource, string sheetNameSource, string sqlTarget, string sheetNameTarget, string exportKey, string? fileName = null)
+        public async Task<bool> ExportToExcelAsync(string sqlSource, string sheetNameSource, string sqlTarget, string sheetNameTarget, string exportKey, string? fileName = null)
         {
             try
             {
@@ -83,30 +83,21 @@ namespace SqlToExcel.Services
                 };
 
                 var defaultFileName = fileName ?? $"Export_{exportKey}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-                SaveSheetsToFile(sheets, defaultFileName);
-                MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (SaveSheetsToFile(sheets, defaultFileName))
+                {
+                    MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return true;
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"导出过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 throw; // Re-throw to be caught by the caller if needed
             }
+            return false;
         }
 
-        public async Task ExportToExcel(MainViewModel vm)
-        {
-            try
-            {
-                vm.StatusMessage = "正在执行查询...";
-                await ExportToExcelAsync(vm.SqlQuery1, vm.SheetName1, vm.SqlQuery2, vm.SheetName2, "All");
-                vm.StatusMessage = "文件已成功导出。";
-            }
-            catch (Exception ex)
-            {
-                vm.StatusMessage = $"导出失败: {ex.Message}";
-                // The message box is already shown in the new method, so we don't need it here.
-            }
-        }
+        
 
         public void ExportSingleSheet(DataTable data, string sheetName)
         {
@@ -117,8 +108,10 @@ namespace SqlToExcel.Services
                     [sheetName] = data
                 };
 
-                SaveSheetsToFile(sheets, $"Export_{sheetName}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
-                MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (SaveSheetsToFile(sheets, $"Export_{sheetName}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx"))
+                {
+                    MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
             catch (Exception ex)
             {
@@ -167,7 +160,7 @@ namespace SqlToExcel.Services
             return width;
         }
 
-        private void SaveSheetsToFile(IDictionary<string, object> sheets, string defaultFileName)
+        private bool SaveSheetsToFile(IDictionary<string, object> sheets, string defaultFileName)
         {
             var saveFileDialog = new SaveFileDialog
             {
@@ -315,7 +308,9 @@ namespace SqlToExcel.Services
                     }
                     package.Save();
                 }
+                return true;
             }
+            return false;
         }
 
         public void ExportComparisonResults(IEnumerable<TableComparisonResultViewModel> results)
@@ -336,8 +331,10 @@ namespace SqlToExcel.Services
                     return;
                 }
 
-                SaveSheetsToFile(sheets, $"FieldComparison_{DateTime.Now:yyyyMMdd}.xlsx");
-                MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (SaveSheetsToFile(sheets, $"FieldComparison_{DateTime.Now:yyyyMMdd}.xlsx"))
+                {
+                    MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
             catch (Exception ex)
             {
@@ -345,7 +342,7 @@ namespace SqlToExcel.Services
             }
         }
 
-        public async Task BatchExportToFolderAsync(
+        public async Task<bool> BatchExportToFolderAsync(
             IEnumerable<BatchExportConfig> configs,
             string targetFolder,
             IProgress<(int current, int total, string currentItem)>? progress = null,
@@ -353,59 +350,61 @@ namespace SqlToExcel.Services
         {
             var configList = configs.ToList();
             var total = configList.Count;
-            
+            bool allSucceeded = true;
+
             for (int i = 0; i < configList.Count; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 var config = configList[i];
-                var index = i + 1;
-                
+
                 progress?.Report((i, total, config.Key));
-                
+
                 try
                 {
                     // Build the filename
                     string tableName = config.DataSource.TableName ?? ExtractTableNameFromSql(config.DataSource.Sql);
-                    string fileName = $"{index}) {config.Key}-[{tableName}(Source)].xlsx";
+                    string fileName = $"{config.Prefix}) {config.Key}-{tableName}(Source).xlsx";
                     string fullPath = Path.Combine(targetFolder, fileName);
-                    
+
                     // Execute queries
                     var task1 = GetDataTableAsync(config.DataSource.Sql, "source");
                     var task2 = GetDataTableAsync(config.DataTarget.Sql, "target");
-                    
+
                     await Task.WhenAll(task1, task2);
-                    
+
                     DataTable dt1 = task1.Result;
                     DataTable dt2 = task2.Result;
-                    
+
                     var sqlLog = new List<object>
                     {
                         new { SheetName = config.DataSource.SheetName, SQL_Query = config.DataSource.Sql, Comments = string.Empty },
                         new { SheetName = config.DataTarget.SheetName, SQL_Query = config.DataTarget.Sql, Comments = string.Empty }
                     };
-                    
+
                     var sheets = new Dictionary<string, object>
                     {
                         [config.DataSource.SheetName] = dt1,
                         [config.DataTarget.SheetName] = dt2,
                         ["Comments"] = sqlLog
                     };
-                    
+
                     // Save directly to the specified path
-                    SaveSheetsToPath(sheets, fullPath);
+                    await SaveSheetsToPathAsync(sheets, fullPath);
                 }
                 catch (Exception ex)
                 {
-                    // Log the error but continue with next item
-                    throw new Exception($"导出配置 '{config.Key}' 失败: {ex.Message}", ex);
+                    allSucceeded = false;
+                    // Log the error to the debug console, but don't stop the batch.
+                    System.Diagnostics.Debug.WriteLine($"Failed to export '{config.Key}': {ex.Message}");
                 }
             }
-            
+
             progress?.Report((total, total, "批量导出完成"));
+            return allSucceeded;
         }
 
-        private void SaveSheetsToPath(IDictionary<string, object> sheets, string filePath)
+        private async Task SaveSheetsToPathAsync(IDictionary<string, object> sheets, string filePath)
         {
             // Ensure directory exists
             var directory = Path.GetDirectoryName(filePath);
@@ -532,7 +531,7 @@ namespace SqlToExcel.Services
                         }
                     }
                 }
-                package.Save();
+                await package.SaveAsAsync(new FileInfo(filePath));
             }
         }
     }

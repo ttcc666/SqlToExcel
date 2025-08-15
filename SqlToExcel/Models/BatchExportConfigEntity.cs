@@ -17,5 +17,7 @@ namespace SqlToExcel.Models
         /// DataTarget as JSON string
         /// </summary>
         public string DataTargetJson { get; set; } = null!;
+
+        public string Prefix { get; set; } = string.Empty;
     }
 }

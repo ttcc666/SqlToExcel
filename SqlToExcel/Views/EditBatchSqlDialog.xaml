@@ -1,0 +1,40 @@
+<Window x:Class="SqlToExcel.Views.EditBatchSqlDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:hc="https://handyorg.github.io/handycontrol"
+        mc:Ignorable="d"
+        Title="编辑SQL语句" Height="600" Width="800"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,5">
+            <TextBlock Text="配置键：" FontWeight="Bold"/>
+            <TextBlock Text="{Binding Key}"/>
+        </StackPanel>
+
+        <hc:SimpleText Grid.Row="1" Text="源SQL" Margin="0,5,0,2"/>
+        <TextBox Grid.Row="2" Text="{Binding SourceSql, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                 FontFamily="Consolas"/>
+
+        <hc:SimpleText Grid.Row="3" Text="目标SQL" Margin="0,10,0,2"/>
+        <TextBox Grid.Row="4" Text="{Binding TargetSql, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                 FontFamily="Consolas"/>
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="保存" Click="SaveButton_Click" Style="{StaticResource ButtonPrimary}" Margin="0,0,10,0"/>
+            <Button Content="取消" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

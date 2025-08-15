@@ -195,7 +195,7 @@ namespace SqlToExcel.ViewModels
             Tables2View.Filter = FilterTables2;
 
             EventService.Subscribe<MappingsChangedEvent>(e => LoadTableMappings());
-            EventService.Subscribe<LoadConfigToMainViewEvent>(OnLoadConfigToMainView);
+            
         }
 
         public void CheckDatabaseConfiguration()
@@ -420,7 +420,23 @@ namespace SqlToExcel.ViewModels
 
         private async Task ExportAsync()
         {
-            await _exportService.ExportToExcel(this);
+            StatusMessage = "正在执行查询和导出...";
+            try
+            {
+                if (await _exportService.ExportToExcelAsync(SqlQuery1, SheetName1, SqlQuery2, SheetName2, "All"))
+                {
+                    StatusMessage = "文件已成功导出。";
+                }
+                else
+                {
+                    StatusMessage = "导出操作已取消。";
+                }
+            }
+            catch
+            {
+                // The service itself will show a detailed error message box.
+                StatusMessage = "导出失败，请检查SQL或文件权限。";
+            }
         }
 
         private async Task PreviewAsync(string sql, string sheetName, string dbKey)
@@ -733,293 +749,7 @@ namespace SqlToExcel.ViewModels
             StatusMessage = "状态已重置。";
         }
 
-        private void OnLoadConfigToMainView(LoadConfigToMainViewEvent eventArgs)
-        {
-            Application.Current.Dispatcher.Invoke(async () =>
-            {
-                try
-                {
-                    await LoadConfigToMainViewAsync(eventArgs.Config, eventArgs.IsEditMode, eventArgs.OriginalKey);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"加载配置到主界面时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            });
-        }
-
-        private async Task LoadConfigToMainViewAsync(BatchExportConfig config, bool isEditMode = false, string originalKey = "")
-        {
-            try
-            {
-                StatusMessage = "正在加载配置到主界面...";
-
-                // 重置状态
-                ResetState();
-
-                // 设置编辑模式（在重置之后）
-                IsEditMode = isEditMode;
-                _editingConfigKey = originalKey;
-
-                // 解析SQL以提取表名和列信息
-                var sourceTableName = ExtractTableNameFromSql(config.DataSource.Sql);
-                var targetTableName = ExtractTableNameFromSql(config.DataTarget.Sql);
-
-                // 查找并选择表
-                var sourceTable = Tables1.FirstOrDefault(t => t.Name.Equals(sourceTableName, StringComparison.OrdinalIgnoreCase));
-                var targetTable = Tables2.FirstOrDefault(t => t.Name.Equals(targetTableName, StringComparison.OrdinalIgnoreCase));
-
-                if (sourceTable != null)
-                {
-                    SelectedTable1 = sourceTable;
-                    await LoadColumnsFromSqlAsync(1, config.DataSource.Sql);
-                }
-
-                if (targetTable != null)
-                {
-                    SelectedTable2 = targetTable;
-                    await LoadColumnsFromSqlAsync(2, config.DataTarget.Sql);
-                }
-
-                // 设置SQL和Sheet名称
-                SqlQuery1 = config.DataSource.Sql;
-                SqlQuery2 = config.DataTarget.Sql;
-                SheetName1 = config.DataSource.SheetName;
-                SheetName2 = config.DataTarget.SheetName;
-
-                StatusMessage = isEditMode ? "编辑模式：配置已加载到主界面，列选择和排序信息已映射。" : "配置已加载到主界面，列选择和排序信息已映射。";
-                
-                MessageBox.Show(
-                    isEditMode ?
-                        $"编辑模式：配置 '{originalKey}' 已加载到主界面。列选择和排序状态已恢复，您可以继续编辑。保存时将更新原配置。" :
-                        "配置已加载到主界面。列选择和排序状态已恢复，您可以继续编辑。",
-                    isEditMode ? "编辑配置" : "配置加载成功",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = "加载配置失败。";
-                throw new Exception($"加载配置到主界面时出错: {ex.Message}", ex);
-            }
-        }
-
-        private async Task LoadColumnsFromSqlAsync(int dbIndex, string sql)
-        {
-            try
-            {
-                // 解析SELECT列
-                var selectedColumns = ExtractSelectedColumnsFromSql(sql);
-                var sortColumns = ExtractSortColumnsFromSql(sql);
-
-                // 获取对应的集合
-                var columns = dbIndex == 1 ? Columns1 : Columns2;
-                var selectedColumnNames = dbIndex == 1 ? _selectedColumnNames1 : _selectedColumnNames2;
-                var sortColumnsCollection = dbIndex == 1 ? SortColumns1 : SortColumns2;
-
-                // 设置列选择状态
-                selectedColumnNames.Clear();
-                foreach (var col in columns)
-                {
-                    col.IsSelected = false;
-                }
-
-                foreach (var selectedCol in selectedColumns)
-                {
-                    var matchingCol = columns.FirstOrDefault(c =>
-                        c.Column.DbColumnName.Equals(selectedCol, StringComparison.OrdinalIgnoreCase));
-                    
-                    if (matchingCol != null)
-                    {
-                        matchingCol.IsSelected = true;
-                        selectedColumnNames.Add(matchingCol.Column.DbColumnName);
-                    }
-                }
-
-                // 设置排序状态
-                sortColumnsCollection.Clear();
-                foreach (var sortCol in sortColumns)
-                {
-                    var matchingCol = columns.FirstOrDefault(c =>
-                        c.Column.DbColumnName.Equals(sortCol.ColumnName, StringComparison.OrdinalIgnoreCase));
-                    
-                    if (matchingCol != null)
-                    {
-                        var sortableColumn = new SortableColumn(sortCol.ColumnName);
-                        sortableColumn.Direction = sortCol.Direction;
-                        sortColumnsCollection.Add(sortableColumn);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // 如果解析失败，至少保证基本功能可用
-                System.Diagnostics.Debug.WriteLine($"解析SQL列信息时出错: {ex.Message}");
-            }
-        }
-
-        private List<string> ExtractSelectedColumnsFromSql(string sql)
-        {
-            var columns = new List<string>();
-            try
-            {
-                var selectIndex = sql.IndexOf("SELECT", StringComparison.OrdinalIgnoreCase);
-                var fromIndex = sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
-                
-                if (selectIndex == -1 || fromIndex == -1) return columns;
-
-                var selectPart = sql.Substring(selectIndex + 6, fromIndex - selectIndex - 6).Trim();
-                
-                // 移除TOP子句
-                var topMatch = System.Text.RegularExpressions.Regex.Match(selectPart, @"^\s*TOP\s+\d+\s+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                if (topMatch.Success)
-                {
-                    selectPart = selectPart.Substring(topMatch.Length).Trim();
-                }
-
-                // 按逗号分割列，但要注意处理方括号
-                var columnParts = SplitSqlColumns(selectPart);
-                
-                foreach (var part in columnParts)
-                {
-                    var trimmedPart = part.Trim();
-                    
-                    // 处理别名情况（如 [column] AS [alias] 或 column AS alias）
-                    var asIndex = trimmedPart.LastIndexOf(" AS ", StringComparison.OrdinalIgnoreCase);
-                    string columnName;
-                    
-                    if (asIndex > 0)
-                    {
-                        // 有别名，取AS前面的部分
-                        columnName = trimmedPart.Substring(0, asIndex).Trim();
-                    }
-                    else
-                    {
-                        columnName = trimmedPart;
-                    }
-                    
-                    // 移除方括号
-                    columnName = columnName.Trim('[', ']');
-                    
-                    // 跳过NULL AS的情况
-                    if (!columnName.Equals("NULL", StringComparison.OrdinalIgnoreCase))
-                    {
-                        columns.Add(columnName);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"解析SELECT列时出错: {ex.Message}");
-            }
-            
-            return columns;
-        }
-
-        private List<string> SplitSqlColumns(string selectPart)
-        {
-            var result = new List<string>();
-            var current = "";
-            var bracketDepth = 0;
-            
-            for (int i = 0; i < selectPart.Length; i++)
-            {
-                char c = selectPart[i];
-                
-                if (c == '[')
-                {
-                    bracketDepth++;
-                    current += c;
-                }
-                else if (c == ']')
-                {
-                    bracketDepth--;
-                    current += c;
-                }
-                else if (c == ',' && bracketDepth == 0)
-                {
-                    result.Add(current.Trim());
-                    current = "";
-                }
-                else
-                {
-                    current += c;
-                }
-            }
-            
-            if (!string.IsNullOrWhiteSpace(current))
-            {
-                result.Add(current.Trim());
-            }
-            
-            return result;
-        }
-
-        private List<(string ColumnName, SortDirection Direction)> ExtractSortColumnsFromSql(string sql)
-        {
-            var sortColumns = new List<(string, SortDirection)>();
-            try
-            {
-                var orderByIndex = sql.IndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
-                if (orderByIndex == -1) return sortColumns;
-
-                var orderByPart = sql.Substring(orderByIndex + 8).Trim();
-                
-                // 按逗号分割排序列
-                var sortParts = orderByPart.Split(',');
-                
-                foreach (var part in sortParts)
-                {
-                    var trimmedPart = part.Trim();
-                    
-                    // 移除COLLATE子句
-                    var collateIndex = trimmedPart.IndexOf(" COLLATE ", StringComparison.OrdinalIgnoreCase);
-                    if (collateIndex > 0)
-                    {
-                        var beforeCollate = trimmedPart.Substring(0, collateIndex).Trim();
-                        var afterCollate = trimmedPart.Substring(collateIndex);
-                        var nextSpaceIndex = afterCollate.IndexOf(' ', 9); // 9 = " COLLATE ".Length
-                        if (nextSpaceIndex > 0)
-                        {
-                            trimmedPart = beforeCollate + afterCollate.Substring(nextSpaceIndex);
-                        }
-                        else
-                        {
-                            trimmedPart = beforeCollate;
-                        }
-                    }
-                    
-                    // 确定排序方向
-                    var direction = SortDirection.Ascending;
-                    var columnName = trimmedPart;
-                    
-                    if (trimmedPart.EndsWith(" DESC", StringComparison.OrdinalIgnoreCase))
-                    {
-                        direction = SortDirection.Descending;
-                        columnName = trimmedPart.Substring(0, trimmedPart.Length - 5).Trim();
-                    }
-                    else if (trimmedPart.EndsWith(" ASC", StringComparison.OrdinalIgnoreCase))
-                    {
-                        direction = SortDirection.Ascending;
-                        columnName = trimmedPart.Substring(0, trimmedPart.Length - 4).Trim();
-                    }
-                    
-                    // 移除方括号
-                    columnName = columnName.Trim('[', ']');
-                    
-                    if (!string.IsNullOrWhiteSpace(columnName))
-                    {
-                        sortColumns.Add((columnName, direction));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"解析ORDER BY子句时出错: {ex.Message}");
-            }
-            
-            return sortColumns;
-        }
+        
 
         private string ExtractTableNameFromSql(string sql)
         {

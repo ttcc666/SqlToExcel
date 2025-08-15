@@ -33,9 +33,16 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="前缀" Width="80">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding Prefix, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                
                 <DataGridTextColumn Header="键" Binding="{Binding Key}" Width="*" IsReadOnly="True"/>
-                <DataGridTextColumn Header="源描述" Binding="{Binding SourceDescription}" Width="*" IsReadOnly="True"/>
-                <DataGridTextColumn Header="目标描述" Binding="{Binding TargetDescription}" Width="*" IsReadOnly="True"/>
+                
                 <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="*" IsReadOnly="True"/>
                 <DataGridTemplateColumn Header="操作" Width="*">
                     <DataGridTemplateColumn.CellTemplate>

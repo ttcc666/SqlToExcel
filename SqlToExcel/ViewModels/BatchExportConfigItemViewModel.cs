@@ -15,6 +15,21 @@ namespace SqlToExcel.ViewModels
         public string SourceDescription => Config.DataSource.Description;
         public string TargetDescription => Config.DataTarget.Description;
 
+        
+
+        public string Prefix
+        {
+            get => Config.Prefix;
+            set
+            {
+                if (Config.Prefix != value)
+                {
+                    Config.Prefix = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public string Status
         {
             get => _status;

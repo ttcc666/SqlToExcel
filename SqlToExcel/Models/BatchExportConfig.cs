@@ -5,6 +5,7 @@ namespace SqlToExcel.Models
         public string Key { get; set; } = null!;
         public QueryConfig DataSource { get; set; } = null!;
         public QueryConfig DataTarget { get; set; } = null!;
+        public string Prefix { get; set; }
     }
 
     public class QueryConfig
