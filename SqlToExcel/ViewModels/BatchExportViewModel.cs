@@ -143,6 +143,8 @@ namespace SqlToExcel.ViewModels
                     item.Config.DataTarget.Sql,
                     item.Config.DataTarget.SheetName,
                     item.Config.Key,
+                    item.Config.DataSource.Description,
+                    item.Config.DataTarget.Description,
                     fileName);
 
                 if (success)

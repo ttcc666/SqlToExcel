@@ -24,17 +24,35 @@ namespace SqlToExcel.ViewModels
             set { _targetSql = value; OnPropertyChanged(); }
         }
 
+        private string _sourceDescription;
+        public string SourceDescription
+        {
+            get => _sourceDescription;
+            set { _sourceDescription = value; OnPropertyChanged(); }
+        }
+
+        private string _targetDescription;
+        public string TargetDescription
+        {
+            get => _targetDescription;
+            set { _targetDescription = value; OnPropertyChanged(); }
+        }
+
         public EditBatchSqlViewModel(BatchExportConfig config)
         {
             _config = config;
             _sourceSql = config.DataSource.Sql;
             _targetSql = config.DataTarget.Sql;
+            _sourceDescription = config.DataSource.Description;
+            _targetDescription = config.DataTarget.Description;
         }
 
         public void SaveChanges()
         {
             _config.DataSource.Sql = SourceSql;
             _config.DataTarget.Sql = TargetSql;
+            _config.DataSource.Description = SourceDescription;
+            _config.DataTarget.Description = TargetDescription;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

@@ -57,7 +57,7 @@ namespace SqlToExcel.Services
             }
         }
 
-        public async Task<bool> ExportToExcelAsync(string sqlSource, string sheetNameSource, string sqlTarget, string sheetNameTarget, string exportKey, string? fileName = null)
+        public async Task<bool> ExportToExcelAsync(string sqlSource, string sheetNameSource, string sqlTarget, string sheetNameTarget, string exportKey, string sourceDescription, string targetDescription, string? fileName = null)
         {
             try
             {
@@ -71,8 +71,8 @@ namespace SqlToExcel.Services
 
                 var sqlLog = new List<object>
                 {
-                    new { SheetName = sheetNameSource, SQL_Query = sqlSource, Comments=string.Empty },
-                    new { SheetName = sheetNameTarget, SQL_Query = sqlTarget, Comments=string.Empty }
+                    new { SheetName = sheetNameSource, SQL_Query = sqlSource, Comments=sourceDescription },
+                    new { SheetName = sheetNameTarget, SQL_Query = sqlTarget, Comments=targetDescription }
                 };
 
                 var sheets = new Dictionary<string, object>
@@ -378,8 +378,8 @@ namespace SqlToExcel.Services
 
                     var sqlLog = new List<object>
                     {
-                        new { SheetName = config.DataSource.SheetName, SQL_Query = config.DataSource.Sql, Comments = string.Empty },
-                        new { SheetName = config.DataTarget.SheetName, SQL_Query = config.DataTarget.Sql, Comments = string.Empty }
+                        new { SheetName = config.DataSource.SheetName, SQL_Query = config.DataSource.Sql, Comments = config.DataSource.Description },
+                        new { SheetName = config.DataTarget.SheetName, SQL_Query = config.DataTarget.Sql, Comments = config.DataTarget.Description }
                     };
 
                     var sheets = new Dictionary<string, object>

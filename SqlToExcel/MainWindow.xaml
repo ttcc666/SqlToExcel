@@ -28,6 +28,8 @@
             <MenuItem Header="_工具">
                 <MenuItem Header="_字段类型提取" Click="OpenFieldTypeExtractor_Click" />
                 <MenuItem Header="_字段对比" Click="OpenFieldComparison_Click" />
+                <Separator />
+                <MenuItem Header="_Target表信息比对" Command="{Binding ShowTableComparisonCommand}" />
             </MenuItem>
         </Menu>
 

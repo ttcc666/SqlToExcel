@@ -164,6 +164,7 @@ namespace SqlToExcel.ViewModels
         public ICommand SaveConfigCommand { get; }
         public ICommand ImportJsonCommand { get; }
         public ICommand ResetCommand { get; }
+        public ICommand ShowTableComparisonCommand { get; }
  
         private readonly ExcelExportService _exportService;
         private readonly ThemeService _themeService;
@@ -186,6 +187,7 @@ namespace SqlToExcel.ViewModels
             SaveConfigCommand = new RelayCommand(async p => await SaveConfigAsync(), p => CanSaveConfig());
             ImportJsonCommand = new RelayCommand(async p => await ImportJsonAsync(), p => !IsJsonImported);
             ResetCommand = new RelayCommand(p => ResetState(), p => IsJsonImported || IsEditMode);
+            ShowTableComparisonCommand = new RelayCommand(p => OpenTableComparison());
  
             LoadTableMappings();
  
@@ -423,7 +425,7 @@ namespace SqlToExcel.ViewModels
             StatusMessage = "正在执行查询和导出...";
             try
             {
-                if (await _exportService.ExportToExcelAsync(SqlQuery1, SheetName1, SqlQuery2, SheetName2, "All"))
+                if (await _exportService.ExportToExcelAsync(SqlQuery1, SheetName1, SqlQuery2, SheetName2, "All",string.Empty,string.Empty))
                 {
                     StatusMessage = "文件已成功导出。";
                 }
@@ -775,6 +777,23 @@ namespace SqlToExcel.ViewModels
             {
                 return "";
             }
+        }
+
+        private void OpenTableComparison()
+        {
+            var viewModel = new TableComparisonViewModel();
+            var window = new Window
+            {
+                Title = "Target表信息比对",
+                Content = new TableComparisonView
+                {
+                    DataContext = viewModel
+                },
+                Width = 800,
+                Height = 600,
+                Owner = Application.Current.MainWindow
+            };
+            window.Show();
         }
     }
 }

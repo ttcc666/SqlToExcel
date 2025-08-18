@@ -5,14 +5,12 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:hc="https://handyorg.github.io/handycontrol"
         mc:Ignorable="d"
-        Title="编辑SQL语句" Height="600" Width="800"
+        Title="编辑SQL与描述" Height="700" Width="800"
         WindowStartupLocation="CenterOwner">
     <Grid Margin="15">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -22,17 +20,37 @@
             <TextBlock Text="{Binding Key}"/>
         </StackPanel>
 
-        <hc:SimpleText Grid.Row="1" Text="源SQL" Margin="0,5,0,2"/>
-        <TextBox Grid.Row="2" Text="{Binding SourceSql, UpdateSourceTrigger=PropertyChanged}"
-                 AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                 FontFamily="Consolas"/>
+        <GroupBox Grid.Row="1" Header="源 (Source)" Margin="0,5">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <hc:SimpleText Grid.Row="0" Text="描述"/>
+                <TextBox Grid.Row="1" Text="{Binding SourceDescription, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MaxLength="100" Margin="0,2,0,5"/>
+                <hc:SimpleText Grid.Row="2" Text="SQL"/>
+                <TextBox Grid.Row="3" Text="{Binding SourceSql, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,2,0,0"/>
+            </Grid>
+        </GroupBox>
 
-        <hc:SimpleText Grid.Row="3" Text="目标SQL" Margin="0,10,0,2"/>
-        <TextBox Grid.Row="4" Text="{Binding TargetSql, UpdateSourceTrigger=PropertyChanged}"
-                 AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                 FontFamily="Consolas"/>
+        <GroupBox Grid.Row="2" Header="目标 (Target)" Margin="0,5">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <hc:SimpleText Grid.Row="0" Text="描述"/>
+                <TextBox Grid.Row="1" Text="{Binding TargetDescription, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MaxLength="100" Margin="0,2,0,5"/>
+                <hc:SimpleText Grid.Row="2" Text="SQL"/>
+                <TextBox Grid.Row="3" Text="{Binding TargetSql, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,2,0,0"/>
+            </Grid>
+        </GroupBox>
 
-        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
             <Button Content="保存" Click="SaveButton_Click" Style="{StaticResource ButtonPrimary}" Margin="0,0,10,0"/>
             <Button Content="取消" IsCancel="True"/>
         </StackPanel>

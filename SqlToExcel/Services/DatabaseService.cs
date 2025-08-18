@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SqlToExcel.Services
 {
@@ -66,6 +67,7 @@ namespace SqlToExcel.Services
                 LocalDb?.CodeFirst.InitTables<BatchExportConfigEntity>();
                 LocalDb?.CodeFirst.InitTables<TableMapping>();
                 LocalDb?.CodeFirst.InitTables<ComparisonReport>();
+                LocalDb?.CodeFirst.InitTables<MissingTable>();
 
                 // Validate source/target connections if they exist
                 if (IsConfigured())
@@ -244,6 +246,14 @@ namespace SqlToExcel.Services
         {
             if (LocalDb == null) throw new InvalidOperationException("本地数据库未初始化。");
             await LocalDb.Deleteable<ComparisonReport>().In(tableNames).ExecuteCommandAsync();
+        }
+
+        public async System.Threading.Tasks.Task<List<string>> GetTableNamesAsync()
+        {
+            var db = GetDbConnection("source");
+            if (db == null) return new List<string>();
+            var tables = await System.Threading.Tasks.Task.Run(() => db.DbMaintenance.GetTableInfoList(false));
+            return tables?.Where(t=> !t.Name.StartsWith("_") && !Regex.IsMatch(t.Name,"[0-9]+")).Select(t => t.Name).ToList() ?? new List<string>();
         }
     }
 }

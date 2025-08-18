@@ -176,5 +176,29 @@ namespace SqlToExcel.Services
             if (result > 0) EventService.Publish(new MappingsChangedEvent());
             return result > 0;
         }
+
+        public async Task SaveMissingTablesAsync(IEnumerable<string> tableNames)
+        {
+            var entities = tableNames.Select(name => new MissingTable
+            {
+                TableName = name,
+                ComparisonDate = DateTime.Now
+            }).ToList();
+
+            if (entities.Any())
+            {
+                await _dbService.LocalDb.Insertable(entities).ExecuteCommandAsync();
+            }
+        }
+
+        public async Task<List<MissingTable>> GetMissingTablesAsync()
+        {
+            return await _dbService.LocalDb.Queryable<MissingTable>().OrderBy(it => it.ComparisonDate, SqlSugar.OrderByType.Desc).ToListAsync();
+        }
+
+        public async Task DeleteMissingTablesAsync(IEnumerable<int> ids)
+        {
+            await _dbService.LocalDb.Deleteable<MissingTable>().In(ids).ExecuteCommandAsync();
+        }
     }
 }
