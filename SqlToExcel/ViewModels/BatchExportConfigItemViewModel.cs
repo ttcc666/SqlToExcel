@@ -54,6 +54,17 @@ namespace SqlToExcel.ViewModels
             Config = config;
         }
 
+        public void Update(BatchExportConfig newConfig)
+        {
+            Config.DataSource = newConfig.DataSource;
+            Config.DataTarget = newConfig.DataTarget;
+            Config.Prefix = newConfig.Prefix;
+            // Key is the identifier, should not be changed.
+
+            // Notify that all properties may have changed.
+            OnPropertyChanged(string.Empty); 
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {

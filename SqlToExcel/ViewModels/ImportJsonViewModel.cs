@@ -41,20 +41,11 @@ namespace SqlToExcel.ViewModels
                 MessageBox.Show("JSON内容不能为空。", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            try
+            ResultJson = JsonText;
+            if (window != null)
             {
-                // 验证JSON格式是否正确
-                JsonSerializer.Deserialize<JsonMapping>(JsonText);
-                ResultJson = JsonText;
-                if (window != null)
-                {
-                    window.DialogResult = true;
-                    window.Close();
-                }
-            }
-            catch (JsonException ex)
-            {
-                MessageBox.Show($"JSON格式无效: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                window.DialogResult = true;
+                window.Close();
             }
         }
 

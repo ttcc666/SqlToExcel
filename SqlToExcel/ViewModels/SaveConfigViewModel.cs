@@ -61,12 +61,14 @@ namespace SqlToExcel.ViewModels
         // 对话框结果
         public bool? DialogResult { get; set; }
 
-        public SaveConfigViewModel(string sourceSql, string sourceSheetName, string targetSql, string targetSheetName)
+        public SaveConfigViewModel(string sourceSql, string sourceSheetName, string targetSql, string targetSheetName, string? sourceDescription = null, string? targetDescription = null)
         {
             _sourceSql = sourceSql;
             SourceSheetName = sourceSheetName;
             _targetSql = targetSql;
             TargetSheetName = targetSheetName;
+            _sourceDescription = sourceDescription ?? "";
+            _targetDescription = targetDescription ?? "";
 
             SaveCommand = new RelayCommand(Save, CanSave);
             CancelCommand = new RelayCommand(Cancel);

@@ -252,11 +252,27 @@ namespace SqlToExcel.ViewModels
 
         private void LoadColumns(int dbIndex)
         {
+            Action<ObservableCollection<SelectableDbColumn>, ObservableCollection<SortableColumn>> setDefaultSort = 
+                (columns, sortColumns) =>
+            {
+                var primaryKeyColumns = columns.Where(c => c.Column.IsPrimarykey).ToList();
+                if (primaryKeyColumns.Any())
+                {
+                    sortColumns.Clear();
+                    foreach (var pk in primaryKeyColumns)
+                    {
+                        sortColumns.Add(new SortableColumn(pk.Column.DbColumnName));
+                    }
+                }
+            };
+
             if (dbIndex == 1 && SelectedTable1 != null)
             {
                 Columns1.Clear();
                 _selectedColumnNames1.Clear();
+                SortColumns1.Clear();
                 DatabaseService.Instance.GetColumns("source", SelectedTable1.Name).ForEach(c => Columns1.Add(new SelectableDbColumn(c)));
+                setDefaultSort(Columns1, SortColumns1);
 
                 var key = SelectedTable1.Name.Split('.').Last();
                 if (_tableMappings.TryGetValue(key, out var targetTable))
@@ -268,7 +284,9 @@ namespace SqlToExcel.ViewModels
             {
                 Columns2.Clear();
                 _selectedColumnNames2.Clear();
+                SortColumns2.Clear();
                 DatabaseService.Instance.GetColumns("target", SelectedTable2.Name).ForEach(c => Columns2.Add(new SelectableDbColumn(c)));
+                setDefaultSort(Columns2, SortColumns2);
             }
         }
 
@@ -381,9 +399,25 @@ namespace SqlToExcel.ViewModels
             if (sortColumns.Any())
             {
                 var columns = dbIndex == 1 ? Columns1 : Columns2;
-                var sortClauses = sortColumns.Select(sc =>
+                var sortClauses = sortColumns.Select((sc, index) =>
                 {
-                    var colInfo = columns.FirstOrDefault(c => c.Column.DbColumnName == sc.ColumnName)?.Column;
+                    var colInfo = columns.FirstOrDefault(c => c.Column.DbColumnName.Equals(sc.ColumnName, StringComparison.OrdinalIgnoreCase))?.Column;
+
+                    // 特殊处理：如果目标列是文本而源列是整数，则尝试将目标列转为整数排序
+                    if (dbIndex == 2 && colInfo != null && colInfo.DataType.ToLower().Contains("char"))
+                    {
+                        if (index < SortColumns1.Count)
+                        {
+                            var sourceSortColumnName = SortColumns1[index].ColumnName;
+                            var sourceColInfo = Columns1.FirstOrDefault(c => c.Column.DbColumnName.Equals(sourceSortColumnName, StringComparison.OrdinalIgnoreCase))?.Column;
+                            if (sourceColInfo != null && sourceColInfo.DataType.ToLower() == "int")
+                            {
+                                return $"TRY_CAST([{sc.ColumnName}] AS INT) {(sc.Direction == SortDirection.Ascending ? "ASC" : "DESC")}";
+                            }
+                        }
+                    }
+
+                    // 默认行为
                     string collation = "";
                     if (colInfo != null)
                     {
@@ -516,42 +550,41 @@ namespace SqlToExcel.ViewModels
                    !string.IsNullOrWhiteSpace(SqlQuery1) &&
                    !string.IsNullOrWhiteSpace(SqlQuery2) &&
                    !string.IsNullOrWhiteSpace(SheetName1) &&
-                   !string.IsNullOrWhiteSpace(SheetName2);
+                   !string.IsNullOrWhiteSpace(SheetName2) &&
+                   SortColumns1.Count > 0 &&
+                   SortColumns2.Count > 0 &&
+                   SortColumns1.Count == SortColumns2.Count;
         }
 
         private async Task SaveConfigAsync()
         {
+            if (SortColumns1.Count == 0 || SortColumns2.Count == 0)
+            {
+                MessageBox.Show("源和目标都必须设置排序字段。", "验证失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (SortColumns1.Count != SortColumns2.Count)
+            {
+                MessageBox.Show("源和目标的排序字段数量必须一致。", "验证失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             try
             {
                 SaveConfigViewModel saveConfigViewModel;
                 
                 if (_isEditMode)
                 {
-                    // 编辑模式：创建临时配置对象并传入
-                    var tempConfig = new BatchExportConfig
-                    {
-                        Key = _editingConfigKey,
-                        DataSource = new QueryConfig
-                        {
-                            SheetName = SheetName1,
-                            TableName = SelectedTable1?.Name,
-                            Sql = SqlQuery1,
-                            Description = ""
-                        },
-                        DataTarget = new QueryConfig
-                        {
-                            SheetName = SheetName2,
-                            TableName = SelectedTable2?.Name,
-                            Sql = SqlQuery2,
-                            Description = ""
-                        }
-                    };
-                    saveConfigViewModel = new SaveConfigViewModel(tempConfig);
+                    // 编辑模式：使用现有配置创建ViewModel
+                    saveConfigViewModel = new SaveConfigViewModel(_originalConfig ?? new Models.BatchExportConfig());
                 }
                 else
                 {
-                    // 新增模式：使用标准构造函数
-                    saveConfigViewModel = new SaveConfigViewModel(SqlQuery1, SheetName1, SqlQuery2, SheetName2);
+                    // 新增模式：生成排序键并创建ViewModel
+                    string sourceSortKey = "Key: " + string.Join(",", SortColumns1.Select(c => c.ColumnName));
+                    string targetSortKey = "Key: " + string.Join(",", SortColumns2.Select(c => c.ColumnName));
+                    saveConfigViewModel = new SaveConfigViewModel(SqlQuery1, SheetName1, SqlQuery2, SheetName2, sourceSortKey, targetSortKey);
                 }
                 
                 var saveConfigDialog = new SaveConfigDialog

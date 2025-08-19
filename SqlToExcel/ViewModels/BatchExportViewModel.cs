@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Text.Json;
 using SqlToExcel.Models;
 using SqlToExcel.Services;
 using SqlToExcel.Views;
@@ -39,6 +41,7 @@ namespace SqlToExcel.ViewModels
         public ICommand DeleteCommand { get; }
         public ICommand EditCommand { get; }
         public ICommand ExportConfigsCommand { get; }
+        public ICommand ImportConfigCommand { get; }
         public ICommand BatchExportCommand { get; }
         public ICommand SelectAllCommand { get; }
         public ICommand ClearSelectionCommand { get; }
@@ -55,6 +58,7 @@ namespace SqlToExcel.ViewModels
             DeleteCommand = new RelayCommand(async param => await DeleteAsync(param as BatchExportConfigItemViewModel), param => CanExecute(param as BatchExportConfigItemViewModel));
             EditCommand = new RelayCommand(async param => await EditAsync(param as BatchExportConfigItemViewModel), param => CanExecute(param as BatchExportConfigItemViewModel));
             ExportConfigsCommand = new RelayCommand(async _ => await ExportConfigsAsync(), _ => !IsBatchExporting);
+            ImportConfigCommand = new RelayCommand(async _ => await ImportConfigAsync(), _ => !IsBatchExporting);
             BatchExportCommand = new RelayCommand(async _ => await BatchExportAsync(), _ => Items.Any(x => x.IsSelected) && !IsBatchExporting);
             SelectAllCommand = new RelayCommand(_ => SelectAll(), _ => !IsBatchExporting);
             ClearSelectionCommand = new RelayCommand(_ => ClearSelection(), _ => !IsBatchExporting);
@@ -233,6 +237,81 @@ namespace SqlToExcel.ViewModels
             if (saveFileDialog.ShowDialog() == true)
             {
                 await _configService.ExportConfigsToJsonAsync(saveFileDialog.FileName);
+            }
+        }
+
+        private async Task ImportConfigAsync()
+        {
+            var importViewModel = new ImportJsonViewModel();
+            var importDialog = new ImportJsonDialog
+            {
+                DataContext = importViewModel,
+                Owner = Application.Current.MainWindow
+            };
+
+            if (importDialog.ShowDialog() == true)
+            {
+                var jsonContent = importViewModel.ResultJson;
+                if (string.IsNullOrWhiteSpace(jsonContent))
+                {
+                    MessageBox.Show("导入的内容为空。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                try
+                {
+                    var importedConfigs = JsonSerializer.Deserialize<List<BatchExportConfig>>(jsonContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    if (importedConfigs == null)
+                    {
+                        MessageBox.Show("无法解析JSON内容，请检查格式。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
+                    int updateCount = 0;
+                    int addCount = 0;
+
+                    foreach (var importedConfig in importedConfigs)
+                    {
+                        var existingItem = Items.FirstOrDefault(i => i.Key == importedConfig.Key);
+                        if (existingItem != null)
+                        {
+                            // Update existing config
+                            existingItem.Update(importedConfig);
+                            updateCount++;
+                        }
+                        else
+                        {
+                            // Add new config
+                            var newItem = new BatchExportConfigItemViewModel(importedConfig)
+                            {
+                                ExportCommand = this.ExportCommand,
+                                PreviewCommand = this.PreviewCommand,
+                                DeleteCommand = this.DeleteCommand,
+                                EditCommand = this.EditCommand
+                            };
+                            newItem.PropertyChanged += OnItemPropertyChanged;
+                            Items.Add(newItem);
+                            addCount++;
+                        }
+                    }
+
+                    // Trigger auto-save
+                    _debounceTimer?.Change(200, Timeout.Infinite);
+
+                    MessageBox.Show($"导入成功！\n更新了 {updateCount} 个配置。\n新增了 {addCount} 个配置。", "导入完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (JsonException ex)
+                {
+                    MessageBox.Show($"JSON格式无效或不匹配: {ex.Message}", "导入失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"处理导入时发生未知错误: {ex.Message}", "导入失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 

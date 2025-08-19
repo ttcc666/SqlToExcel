@@ -12,6 +12,7 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0">
@@ -33,5 +34,11 @@
             <DataGrid x:Name="DataGrid2" Grid.Row="0" ItemsSource="{Binding Data2}" AutoGenerateColumns="True" Style="{StaticResource CustomDataGridStyle}" HeadersVisibility="All" LoadingRow="DataGrid_LoadingRow" AutoGeneratingColumn="DataGrid_AutoGeneratingColumn" />
             <TextBlock Grid.Row="1" Text="{Binding RecordCount2, StringFormat='共 {0} 条记录'}" HorizontalAlignment="Right" Margin="5" />
         </Grid>
+
+        <ToolBar Grid.Row="3" Margin="0,5,0,0">
+            <Button Content="首行验证" Command="{Binding ValidateFirstRowCommand}" Margin="5"/>
+            <Button Content="中间行验证" Command="{Binding ValidateMiddleRowCommand}" Margin="5"/>
+            <Button Content="末行验证" Command="{Binding ValidateLastRowCommand}" Margin="5"/>
+        </ToolBar>
     </Grid>
 </Window>

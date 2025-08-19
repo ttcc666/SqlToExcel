@@ -14,6 +14,7 @@
 
         <ToolBar Grid.Row="0">
             <Button Content="导出配置" Command="{Binding ExportConfigsCommand}" ToolTip="将所有配置导出到一个JSON文件"/>
+            <Button Content="导入配置" Command="{Binding ImportConfigCommand}" ToolTip="从JSON文件或文本导入配置"/>
             <Separator/>
             <Button Content="全选" Command="{Binding SelectAllCommand}" ToolTip="选择所有配置"/>
             <Button Content="取消全选" Command="{Binding ClearSelectionCommand}" ToolTip="取消选择所有配置"/>

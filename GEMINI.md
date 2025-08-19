@@ -1,62 +1,50 @@
-# GEMINI Project Context: SqlToExcel
+# GEMINI Project Analysis: SqlToExcel
 
 ## Project Overview
 
-This is a .NET 9 WPF application built using the MVVM (Model-View-ViewModel) architecture. Its primary purpose is to connect to two separate SQL databases (a source and a target), allow the user to build and execute `SELECT` queries against them, and then export the results from both queries into a single Excel file, with each result set on its own sheet.
+This is a .NET 9 WPF application designed for database administrators and developers to easily export data from two different SQL Server databases into a single Excel file. The application provides a user-friendly interface to build and execute SQL queries, preview the results, and export them to separate sheets in an `.xlsx` file.
 
-The application features a modern UI using the HandyControl library, with support for light and dark themes.
+The project follows the **Model-View-ViewModel (MVVM)** architecture, ensuring a clean separation of concerns. Key technologies used are:
 
-### Key Technologies:
-- **Framework:** .NET 9 (WPF)
-- **Architecture:** MVVM
-- **UI:** HandyControl
-- **Database Access:** SqlSugarCore (an ORM)
-- **Excel Export:** EPPlus (listed in `.csproj`, though `README.md` mentions MiniExcel)
-- **Dependency Injection:** Microsoft.Extensions.DependencyInjection
+*   **UI Framework:** WPF with the [HandyControl](https://github.com/handyorg/handycontrol) library for a modern look and feel.
+*   **Database ORM:** [SqlSugarCore](https://github.com/sqlSugar/SqlSugar) is used for all database interactions, including connecting to source/target SQL Server databases and managing a local SQLite database for configuration storage.
+*   **Excel Export:** The [EPPlus](https://github.com/EPPlusSoftware/EPPlus) library handles the creation and formatting of Excel files.
+*   **Dependency Injection:** `Microsoft.Extensions.DependencyInjection` is used to manage the lifecycle of services and view models.
+
+The application supports features like:
+- Dual database connectivity (source and target).
+- Dynamic SQL query generation via a UI.
+- Manual SQL query editing.
+- Side-by-side data previews.
+- Custom sorting for queries.
+- Saving and managing batch export configurations.
+- A local SQLite database (`config.db`) for storing user configurations.
 
 ## Building and Running
 
-The project can be built and run using standard `dotnet` CLI commands.
+### Prerequisites
+- .NET 9 SDK
 
-1.  **Restore Dependencies:**
-    ```bash
-    dotnet restore SqlToExcelSolution.sln
-    ```
+### Build
+To build the project, run the following command from the root directory:
+```bash
+dotnet build
+```
 
-2.  **Build the Project:**
-    ```bash
-    dotnet build SqlToExcelSolution.sln --configuration Release
-    ```
-
-3.  **Run the Application:**
-    ```bash
-    dotnet run --project SqlToExcel\SqlToExcel.csproj
-    ```
+### Run
+To run the application, use the following command:
+```bash
+dotnet run --project SqlToExcel
+```
 
 ## Development Conventions
 
-### Architecture (MVVM)
-The code is structured following the MVVM pattern:
-- **Views:** Located in `SqlToExcel/Views/`. These are the XAML files that define the UI and bind to ViewModels. Examples: `MainWindow.xaml`, `DatabaseConfigView.xaml`.
-- **ViewModels:** Located in `SqlToExcel/ViewModels/`. These classes contain the application's presentation logic and state. The `MainViewModel.cs` is the central ViewModel for the main window, orchestrating most of the application's functionality. `RelayCommand.cs` is used for implementing the `ICommand` interface.
-- **Models:** Located in `SqlToExcel/Models/`. These are the data structures representing the application's domain objects. Examples: `TableMapping.cs`, `BatchExportConfig.cs`.
-- **Services:** Located in `SqlToExcel/Services/`. These classes encapsulate specific functionalities like database interaction (`DatabaseService.cs`), configuration management (`ConfigService.cs`), and Excel exporting (`ExcelExportService.cs`).
-
-### Dependency Injection
-The application uses `Microsoft.Extensions.DependencyInjection` for managing dependencies. The container is configured in `App.xaml.cs`, where services and ViewModels are registered as singletons. The `ServiceProvider` is then used to resolve instances throughout the application.
-
-### Database Configuration
-- Database connection strings are not hardcoded. The user is prompted to configure them via the `DatabaseConfigView`.
-- The configuration is likely stored locally, as indicated by the `config.db` file in the root directory and the `ConfigFileService.cs`.
-
-### State Management
-- The primary application state is managed within the `MainViewModel`.
-- It holds observable collections for tables, columns, and sort orders, which the UI automatically updates.
-- It exposes `ICommand` properties for all user actions (e.g., `ExportCommand`, `PreviewCommand`).
-
-### Key Files for Understanding the Core Logic
-- **`SqlToExcel/App.xaml.cs`**: Application startup, service registration, and main window creation.
-- **`SqlToExcel/ViewModels/MainViewModel.cs`**: The most important file for understanding the application's core logic, state management, and user command handling.
-- **`SqlToExcel/Services/DatabaseService.cs`**: Handles all interactions with the source and target SQL databases using SqlSugar.
-- **`SqlToExcel/Services/ExcelExportService.cs`**: Contains the logic for exporting `DataTable` objects to an Excel file.
-- **`SqlToExcel/SqlToExcel.csproj`**: Defines project dependencies and build settings.
+*   **MVVM Pattern:** The code is strictly organized following the MVVM pattern.
+    *   **Views:** Located in the `SqlToExcel/Views` directory. They are responsible for the UI layout and user interactions.
+    *   **ViewModels:** Located in the `SqlToExcel/ViewModels` directory. They contain the application logic and expose data to the Views.
+    *   **Models:** Located in the `SqlToExcel/Models` directory. They represent the data structures of the application.
+*   **Services:** Business logic and external interactions (like database access and Excel export) are encapsulated in services, found in the `SqlToExcel/Services` directory.
+*   **Dependency Injection:** Services and ViewModels are registered in `App.xaml.cs` and injected where needed. This promotes loose coupling and testability.
+*   **Database Configuration:** Database connection strings are stored in the user's settings and managed through the `DatabaseConfigView`.
+*   **Local Configuration Storage:** A local SQLite database (`config.db`) is used to store batch export configurations and table mappings. The `DatabaseService` manages access to this database.
+*   **Coding Style:** The code is written in C# and includes Chinese comments. The naming conventions are consistent with .NET standards.
