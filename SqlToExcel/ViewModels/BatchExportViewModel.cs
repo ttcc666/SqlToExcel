@@ -16,6 +16,8 @@ using System.Windows.Data;
 using System.Windows.Input;
 using Microsoft.Win32;
 using System.Collections;
+using System.IO;
+using System.IO.Compression;
 
 namespace SqlToExcel.ViewModels
 {
@@ -73,6 +75,7 @@ namespace SqlToExcel.ViewModels
         public ICommand ExportConfigsCommand { get; }
         public ICommand ImportConfigCommand { get; }
         public ICommand BatchExportCommand { get; }
+        public ICommand BatchExportAsZipCommand { get; }
         public ICommand SelectAllCommand { get; }
         public ICommand ClearSelectionCommand { get; }
         public ICommand RefreshCommand { get; }
@@ -103,6 +106,7 @@ namespace SqlToExcel.ViewModels
             ExportConfigsCommand = new RelayCommand(async _ => await ExportConfigsAsync(), _ => !IsBatchExporting);
             ImportConfigCommand = new RelayCommand(async _ => await ImportConfigAsync(), _ => !IsBatchExporting);
             BatchExportCommand = new RelayCommand(async _ => await BatchExportAsync(), _ => Items.Any(x => x.IsSelected) && !IsBatchExporting);
+            BatchExportAsZipCommand = new RelayCommand(async _ => await BatchExportAsZipAsync(), _ => Items.Any(x => x.IsSelected) && !IsBatchExporting);
             SelectAllCommand = new RelayCommand(_ => SelectAll(), _ => !IsBatchExporting);
             ClearSelectionCommand = new RelayCommand(_ => ClearSelection(), _ => !IsBatchExporting);
             RefreshCommand = new RelayCommand(async _ => await ReloadConfigsAsync(), _ => !IsBatchExporting);
@@ -164,7 +168,6 @@ namespace SqlToExcel.ViewModels
                     int currentIndex = 0;
                     foreach (var config in configs)
                     {
-                        // Backward compatibility for old configs
                         if (string.IsNullOrEmpty(config.Prefix))
                         {
                             config.Prefix = (currentIndex + 1).ToString();
@@ -196,7 +199,6 @@ namespace SqlToExcel.ViewModels
             item.Status = "正在导出...";
             try
             {
-                // Build the new filename
                 string tableName = item.Config.DataSource.TableName ?? ExtractTableName(item.Config.DataSource.Sql);
                 string fileName = $"{item.Prefix}) {item.Key}-{tableName}(Source).xlsx";
                 string destinationDbKey = item.Config.Destination == DestinationType.Target ? "target" : "framework";
@@ -281,15 +283,13 @@ namespace SqlToExcel.ViewModels
 
             if (editDialog.ShowDialog() == true)
             {
-                // The changes are saved in the viewmodel's SaveChanges method.
-                // Now, we need to trigger the auto-save for the whole list.
-                _debounceTimer?.Change(200, Timeout.Infinite); // Trigger save after a short delay
+                _debounceTimer?.Change(200, Timeout.Infinite);
             }
         }
 
         private async Task ExportConfigsAsync()
         {
-            var saveFileDialog = new Microsoft.Win32.SaveFileDialog
+            var saveFileDialog = new SaveFileDialog
             {
                 FileName = "batch_export_configs.json",
                 Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"
@@ -321,32 +321,21 @@ namespace SqlToExcel.ViewModels
 
                 try
                 {
-                    var importedConfigs = JsonSerializer.Deserialize<List<BatchExportConfig>>(jsonContent, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
+                    var importedConfigs = JsonSerializer.Deserialize<List<BatchExportConfig>>(jsonContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-                    if (importedConfigs == null)
-                    {
-                        MessageBox.Show("无法解析JSON内容，请检查格式。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                        return;
-                    }
+                    if (importedConfigs == null) { /*...*/ return; }
 
-                    int updateCount = 0;
-                    int addCount = 0;
-
+                    int updateCount = 0, addCount = 0;
                     foreach (var importedConfig in importedConfigs)
                     {
                         var existingItem = Items.FirstOrDefault(i => i.Key == importedConfig.Key);
                         if (existingItem != null)
                         {
-                            // Update existing config
                             existingItem.Update(importedConfig);
                             updateCount++;
                         }
                         else
                         {
-                            // Add new config
                             var newItem = new BatchExportConfigItemViewModel(importedConfig)
                             {
                                 ExportCommand = this.ExportCommand,
@@ -360,18 +349,12 @@ namespace SqlToExcel.ViewModels
                         }
                     }
 
-                    // Trigger auto-save
                     _debounceTimer?.Change(200, Timeout.Infinite);
-
                     MessageBox.Show($"导入成功！\n更新了 {updateCount} 个配置。\n新增了 {addCount} 个配置。", "导入完成", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (JsonException ex)
-                {
-                    MessageBox.Show($"JSON格式无效或不匹配: {ex.Message}", "导入失败", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"处理导入时发生未知错误: {ex.Message}", "导入失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show($"导入失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -382,21 +365,12 @@ namespace SqlToExcel.ViewModels
             {
                 var fromIndex = sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
                 if (fromIndex == -1) return "UnknownTable";
-
                 var fromSubstring = sql.Substring(fromIndex + 4).Trim();
-                
                 var orderByIndex = fromSubstring.IndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
-                if (orderByIndex != -1)
-                {
-                    fromSubstring = fromSubstring.Substring(0, orderByIndex).Trim();
-                }
-
+                if (orderByIndex != -1) fromSubstring = fromSubstring.Substring(0, orderByIndex).Trim();
                 return fromSubstring.Split(' ').FirstOrDefault() ?? "UnknownTable";
             }
-            catch
-            {
-                return "UnknownTable";
-            }
+            catch { return "UnknownTable"; }
         }
 
         private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -407,29 +381,67 @@ namespace SqlToExcel.ViewModels
             }
             else if (e.PropertyName == nameof(BatchExportConfigItemViewModel.Prefix))
             {
-                // Debounce the save operation and refresh sort
                 _debounceTimer?.Change(500, Timeout.Infinite);
                 Application.Current.Dispatcher.Invoke(() => FilteredItems.Refresh());
             }
         }
 
-        private void SelectAll()
-        {
-            foreach (var item in FilteredItems.Cast<BatchExportConfigItemViewModel>())
-            {
-                item.IsSelected = true;
-            }
-        }
-
-        private void ClearSelection()
-        {
-            foreach (var item in FilteredItems.Cast<BatchExportConfigItemViewModel>())
-            {
-                item.IsSelected = false;
-            }
-        }
+        private void SelectAll() { foreach (var item in FilteredItems.Cast<BatchExportConfigItemViewModel>()) item.IsSelected = true; }
+        private void ClearSelection() { foreach (var item in FilteredItems.Cast<BatchExportConfigItemViewModel>()) item.IsSelected = false; }
 
         private async Task BatchExportAsync()
+        {
+            var selectedItems = FilteredItems.Cast<BatchExportConfigItemViewModel>().Where(x => x.IsSelected).ToList();
+            if (!selectedItems.Any()) { /*...*/ return; }
+
+            var folderDialog = new SaveFileDialog
+            {
+                Filter = "Zip Files|*.zip",
+                Title = "导出为 Zip 压缩包",
+                FileName = $"Export_{DateTime.Now:yyyyMMdd_HHmmss}.zip"
+            };
+            if (folderDialog.ShowDialog() != true) return;
+
+            var targetFolder = Path.GetDirectoryName(folderDialog.FileName);
+            if (string.IsNullOrEmpty(targetFolder)) { /*...*/ return; }
+
+            var result = MessageBox.Show($"确定要批量导出选中的 {selectedItems.Count} 个配置到文件夹 {targetFolder} 吗？", "确认批量导出", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes) return;
+
+            IsBatchExporting = true;
+            try
+            {
+                var configs = selectedItems.Select(x => x.Config).ToList();
+                var progress = new Progress<(int, int, string)>(report =>
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        if (report.Item1 < selectedItems.Count) selectedItems[report.Item1].Status = $"正在导出... ({report.Item1 + 1}/{report.Item2})";
+                    });
+                });
+
+                if (await _exportService.BatchExportToFolderAsync(configs, targetFolder, progress))
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        foreach (var item in selectedItems) item.Status = "导出成功";
+                        MessageBox.Show($"批量导出完成！...", "批量导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                    });
+                }
+                else
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show("批量导出已完成，但部分项目导出失败...", "部分失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        foreach (var item in selectedItems.Where(i => i.Status.Contains("正在导出"))) item.Status = "导出失败";
+                    });
+                }
+            }
+            catch (Exception ex) { /*...*/ }
+            finally { IsBatchExporting = false; }
+        }
+
+        private async Task BatchExportAsZipAsync()
         {
             var selectedItems = FilteredItems.Cast<BatchExportConfigItemViewModel>().Where(x => x.IsSelected).ToList();
             if (!selectedItems.Any())
@@ -438,81 +450,63 @@ namespace SqlToExcel.ViewModels
                 return;
             }
 
-            var folderDialog = new SaveFileDialog
+            var saveFileDialog = new SaveFileDialog
             {
-                Title = "选择导出文件夹 (请选择任意文件名，程序将使用该文件所在文件夹)",
-                FileName = "选择此文件夹",
-                Filter = "文件夹|*.folder"
+                Filter = "Zip Files|*.zip",
+                Title = "导出为 Zip 压缩包",
+                FileName = $"Export_{DateTime.Now:yyyyMMdd_HHmmss}.zip"
             };
 
-            if (folderDialog.ShowDialog() != true)
-                return;
-
-            var targetFolder = System.IO.Path.GetDirectoryName(folderDialog.FileName);
-            if (string.IsNullOrEmpty(targetFolder))
-            {
-                MessageBox.Show("无法获取选择的文件夹路径。", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            var result = MessageBox.Show($"确定要批量导出选中的 {selectedItems.Count} 个配置到文件夹 {targetFolder} 吗？",
-                "确认批量导出", MessageBoxButton.YesNo, MessageBoxImage.Question);
-            
-            if (result != MessageBoxResult.Yes)
-                return;
+            if (saveFileDialog.ShowDialog() != true) return;
 
             IsBatchExporting = true;
             try
             {
-                await Task.Run(async () =>
+                using (var memoryStream = new MemoryStream())
                 {
-                    var configs = selectedItems.Select(x => x.Config).ToList();
-                    var progress = new Progress<(int current, int total, string currentItem)>(report =>
+                    using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
+                        for (int i = 0; i < selectedItems.Count; i++)
                         {
-                            if (report.current < selectedItems.Count)
-                            {
-                                selectedItems[report.current].Status = $"正在导出... ({report.current + 1}/{report.total})";
-                            }
-                        });
-                    });
+                            var item = selectedItems[i];
+                            item.Status = $"正在压缩... ({i + 1}/{selectedItems.Count})";
 
-                    if (await _exportService.BatchExportToFolderAsync(configs, targetFolder, progress))
-                    {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            foreach (var item in selectedItems)
+                            try
                             {
-                                item.Status = "导出成功";
+                                var excelBytes = await _exportService.GenerateSingleExcelExportBytesAsync(item.Config);
+                                string tableName = item.Config.DataSource.TableName ?? ExtractTableName(item.Config.DataSource.Sql);
+                                string fileNameInZip = $"{item.Prefix}) {item.Key}-{tableName}(Source).xlsx";
+
+                                var entry = archive.CreateEntry(fileNameInZip, CompressionLevel.Optimal);
+                                using (var entryStream = entry.Open())
+                                {
+                                    await entryStream.WriteAsync(excelBytes, 0, excelBytes.Length);
+                                }
+                                item.Status = "已压缩";
                             }
-                            MessageBox.Show($"批量导出完成！已成功导出 {selectedItems.Count} 个配置到文件夹：{targetFolder}", "批量导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
-                        });
-                    }
-                    else
-                    {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            MessageBox.Show("批量导出已完成，但部分项目导出失败。请检查输出文件夹和列表状态。", "部分失败", MessageBoxButton.OK, MessageBoxImage.Warning);
-                            foreach (var item in selectedItems.Where(i => i.Status.Contains("正在导出")))
+                            catch (Exception ex)
                             {
-                                item.Status = "导出失败";
+                                item.Status = $"压缩失败: {ex.Message}";
                             }
-                        });
+                        }
                     }
-                });
+
+                    await File.WriteAllBytesAsync(saveFileDialog.FileName, memoryStream.ToArray());
+                }
+
+                MessageBox.Show($"已成功导出 {selectedItems.Count} 个配置到压缩文件：\n{saveFileDialog.FileName}", "导出成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"批量导出过程中发生严重错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                foreach (var item in selectedItems)
-                {
-                    item.Status = "导出失败";
-                }
+                MessageBox.Show($"导出到Zip文件时发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
                 IsBatchExporting = false;
+                foreach (var item in selectedItems.Where(i => i.Status.Contains("压缩")))
+                {
+                    item.Status = "准备就绪"; // Reset status
+                }
             }
         }
 

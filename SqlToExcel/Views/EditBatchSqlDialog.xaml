@@ -29,7 +29,7 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <hc:SimpleText Grid.Row="0" Text="描述"/>
-                <TextBox Grid.Row="1" Text="{Binding SourceDescription, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MaxLength="500" Margin="0,2,0,5"/>
+                <TextBox Grid.Row="1" Text="{Binding SourceDescription, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MaxLength="2000" Margin="0,2,0,5"/>
                 <hc:SimpleText Grid.Row="2" Text="SQL"/>
                 <TextBox Grid.Row="3" Text="{Binding SourceSql, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,2,0,0"/>
             </Grid>
@@ -72,7 +72,7 @@
                     </RadioButton>
                 </StackPanel>
                 <hc:SimpleText Grid.Row="1" Text="描述"/>
-                <TextBox Grid.Row="2" Text="{Binding TargetDescription, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MaxLength="200" Margin="0,2,0,5"/>
+                <TextBox Grid.Row="2" Text="{Binding TargetDescription, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MaxLength="2000" Margin="0,2,0,5"/>
                 <hc:SimpleText Grid.Row="3" Text="SQL"/>
                 <TextBox Grid.Row="4" Text="{Binding TargetSql, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,2,0,0"/>
             </Grid>

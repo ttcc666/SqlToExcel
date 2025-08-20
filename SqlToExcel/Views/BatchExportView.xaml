@@ -19,7 +19,6 @@
                      hc:InfoElement.Placeholder="按键搜索" VerticalAlignment="Center" Style="{StaticResource TextBoxExtend}"/>
             <Separator/>
             <Button Content="刷新" Command="{Binding RefreshCommand}" ToolTip="重新加载所有配置"/>
-            <Separator/>
             <Button Content="导出配置" Command="{Binding ExportConfigsCommand}" ToolTip="将所有配置导出到一个JSON文件"/>
             <Button Content="导入配置" Command="{Binding ImportConfigCommand}" ToolTip="从JSON文件或文本导入配置"/>
             <Separator/>
@@ -27,7 +26,9 @@
             <Button Content="取消全选" Command="{Binding ClearSelectionCommand}" ToolTip="取消选择所有配置"/>
             <Separator/>
             <Button Content="批量导出" Command="{Binding BatchExportCommand}" ToolTip="批量导出选中的配置到指定文件夹"
-                    Style="{StaticResource ButtonPrimary}"/>
+                    Style="{StaticResource ButtonPrimary}" Margin="0,0,5,0"/>
+            <Button Content="导出为Zip" Command="{Binding BatchExportAsZipCommand}" ToolTip="将选中的配置导出到一个Zip压缩包中"
+                    Style="{StaticResource ButtonSuccess}"/>
             <TextBlock Text="{Binding SelectedCountText}" VerticalAlignment="Center" Margin="10,0,0,0"/>
         </ToolBar>
 
@@ -41,10 +42,10 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="前缀" Width="80">
+                <DataGridTemplateColumn Header="前缀" Width="120">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBox Text="{Binding Prefix, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"/>
+                            <TextBox Text="{Binding Prefix, UpdateSourceTrigger=LostFocus}" VerticalAlignment="Center"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
