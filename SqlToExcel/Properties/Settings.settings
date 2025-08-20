@@ -8,5 +8,8 @@
     <Setting Name="TargetConnectionString" Type="System.String" Scope="User">
       <Value Profile="(Default)">Server=192.168.168.28;database=kgm_gclabeling_dbSync;User ID=sa;Password=kgm123!@#;TrustServerCertificate=true;</Value>
     </Setting>
+    <Setting Name="FrameworkConnectionString" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
   </Settings>
 </SettingsFile>

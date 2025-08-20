@@ -1,8 +1,11 @@
 namespace SqlToExcel.Models
 {
+    public enum DestinationType { Target, Framework }
+
     public class BatchExportConfig
     {
         public string Key { get; set; } = null!;
+        public DestinationType Destination { get; set; }
         public QueryConfig DataSource { get; set; } = null!;
         public QueryConfig DataTarget { get; set; } = null!;
         public string Prefix { get; set; }

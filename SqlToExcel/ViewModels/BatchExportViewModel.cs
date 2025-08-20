@@ -12,17 +12,47 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
 using Microsoft.Win32;
+using System.Collections;
 
 namespace SqlToExcel.ViewModels
 {
+    public class BatchExportConfigItemViewModelComparer : IComparer
+    {
+        private readonly NaturalStringComparer _stringComparer = new NaturalStringComparer();
+
+        public int Compare(object a, object b)
+        {
+            if (a is BatchExportConfigItemViewModel itemA && b is BatchExportConfigItemViewModel itemB)
+            {
+                return _stringComparer.Compare(itemA.Prefix, itemB.Prefix);
+            }
+            return 0;
+        }
+    }
+
     public class BatchExportViewModel : INotifyPropertyChanged
     {
-        public ObservableCollection<BatchExportConfigItemViewModel> Items { get; } = new();
+        public ObservableCollection<BatchExportConfigItemViewModel> Items { get; }
+        public ICollectionView FilteredItems { get; }
         private readonly ExcelExportService _exportService;
         private readonly ConfigService _configService;
         private Timer? _debounceTimer;
+
+        private string _searchKeyword = string.Empty;
+        public string SearchKeyword
+        {
+            get => _searchKeyword;
+            set
+            {
+                if (_searchKeyword == value) return;
+                _searchKeyword = value;
+                OnPropertyChanged();
+                FilteredItems.Refresh();
+            }
+        }
 
         private bool _isBatchExporting;
         public bool IsBatchExporting
@@ -45,13 +75,26 @@ namespace SqlToExcel.ViewModels
         public ICommand BatchExportCommand { get; }
         public ICommand SelectAllCommand { get; }
         public ICommand ClearSelectionCommand { get; }
+        public ICommand RefreshCommand { get; }
 
-        public string SelectedCountText => $"已选择 {Items.Count(x => x.IsSelected)} 项";
+        public string SelectedCountText => $"已选择 {FilteredItems.Cast<object>().Count(x => ((BatchExportConfigItemViewModel)x).IsSelected)} 项";
+
+        public string TotalCountText => $"共 {Items.Count} 项";
 
         public BatchExportViewModel(ExcelExportService exportService)
         {
             _exportService = exportService;
             _configService = ConfigService.Instance;
+
+            Items = new ObservableCollection<BatchExportConfigItemViewModel>();
+            FilteredItems = CollectionViewSource.GetDefaultView(Items);
+            FilteredItems.Filter = FilterPredicate;
+            if (FilteredItems is ListCollectionView listCollectionView)
+            {
+                listCollectionView.CustomSort = new BatchExportConfigItemViewModelComparer();
+            }
+
+            Items.CollectionChanged += (s, e) => { OnPropertyChanged(nameof(TotalCountText)); };
 
             ExportCommand = new RelayCommand(async param => await ExportAsync(param as BatchExportConfigItemViewModel), param => CanExecute(param as BatchExportConfigItemViewModel));
             PreviewCommand = new RelayCommand(async param => await PreviewAsync(param as BatchExportConfigItemViewModel), param => CanExecute(param as BatchExportConfigItemViewModel));
@@ -62,10 +105,26 @@ namespace SqlToExcel.ViewModels
             BatchExportCommand = new RelayCommand(async _ => await BatchExportAsync(), _ => Items.Any(x => x.IsSelected) && !IsBatchExporting);
             SelectAllCommand = new RelayCommand(_ => SelectAll(), _ => !IsBatchExporting);
             ClearSelectionCommand = new RelayCommand(_ => ClearSelection(), _ => !IsBatchExporting);
+            RefreshCommand = new RelayCommand(async _ => await ReloadConfigsAsync(), _ => !IsBatchExporting);
 
             _configService.ConfigsChanged += OnConfigsChanged;
             _ = LoadConfigsAsync();
             InitializeDebounceTimer();
+        }
+
+        private bool FilterPredicate(object obj)
+        {
+            if (obj is not BatchExportConfigItemViewModel item)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(SearchKeyword))
+            {
+                return true;
+            }
+
+            return item.Key.Contains(SearchKeyword, StringComparison.OrdinalIgnoreCase);
         }
 
         private void InitializeDebounceTimer()
@@ -103,7 +162,7 @@ namespace SqlToExcel.ViewModels
                 if (configs != null)
                 {
                     int currentIndex = 0;
-                    foreach (var config in configs.OrderBy(c => c.Prefix)) // Sort by prefix on load
+                    foreach (var config in configs)
                     {
                         // Backward compatibility for old configs
                         if (string.IsNullOrEmpty(config.Prefix))
@@ -139,14 +198,15 @@ namespace SqlToExcel.ViewModels
             {
                 // Build the new filename
                 string tableName = item.Config.DataSource.TableName ?? ExtractTableName(item.Config.DataSource.Sql);
-                string fileName = $"{item.Prefix}) {item.Key}-[{tableName}(Source)].xlsx";
+                string fileName = $"{item.Prefix}) {item.Key}-{tableName}(Source).xlsx";
+                string destinationDbKey = item.Config.Destination == DestinationType.Target ? "target" : "framework";
 
                 bool success = await _exportService.ExportToExcelAsync(
                     item.Config.DataSource.Sql,
                     item.Config.DataSource.SheetName,
                     item.Config.DataTarget.Sql,
                     item.Config.DataTarget.SheetName,
-                    item.Config.Key,
+                    destinationDbKey,
                     item.Config.DataSource.Description,
                     item.Config.DataTarget.Description,
                     fileName);
@@ -173,8 +233,9 @@ namespace SqlToExcel.ViewModels
             item.Status = "正在预览...";
             try
             {
+                string destinationDbKey = item.Config.Destination == DestinationType.Target ? "target" : "framework";
                 var task1 = _exportService.GetDataTableAsync(item.Config.DataSource.Sql, "source");
-                var task2 = _exportService.GetDataTableAsync(item.Config.DataTarget.Sql, "target");
+                var task2 = _exportService.GetDataTableAsync(item.Config.DataTarget.Sql, destinationDbKey);
                 await Task.WhenAll(task1, task2);
 
                 DataTable dt1 = task1.Result;
@@ -346,14 +407,15 @@ namespace SqlToExcel.ViewModels
             }
             else if (e.PropertyName == nameof(BatchExportConfigItemViewModel.Prefix))
             {
-                // Debounce the save operation
+                // Debounce the save operation and refresh sort
                 _debounceTimer?.Change(500, Timeout.Infinite);
+                Application.Current.Dispatcher.Invoke(() => FilteredItems.Refresh());
             }
         }
 
         private void SelectAll()
         {
-            foreach (var item in Items)
+            foreach (var item in FilteredItems.Cast<BatchExportConfigItemViewModel>())
             {
                 item.IsSelected = true;
             }
@@ -361,7 +423,7 @@ namespace SqlToExcel.ViewModels
 
         private void ClearSelection()
         {
-            foreach (var item in Items)
+            foreach (var item in FilteredItems.Cast<BatchExportConfigItemViewModel>())
             {
                 item.IsSelected = false;
             }
@@ -369,7 +431,7 @@ namespace SqlToExcel.ViewModels
 
         private async Task BatchExportAsync()
         {
-            var selectedItems = Items.Where(x => x.IsSelected).OrderBy(x => x.Prefix).ToList();
+            var selectedItems = FilteredItems.Cast<BatchExportConfigItemViewModel>().Where(x => x.IsSelected).ToList();
             if (!selectedItems.Any())
             {
                 MessageBox.Show("请先选择要导出的配置。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);

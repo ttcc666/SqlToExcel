@@ -57,6 +57,18 @@ namespace SqlToExcel.Services
                     DbType = DbType.SqlServer,
                     IsAutoCloseConnection = true
                 });
+
+                var frameworkConnection = Properties.Settings.Default.FrameworkConnectionString;
+                if (!string.IsNullOrWhiteSpace(frameworkConnection))
+                {
+                    connectionConfigs.Add(new ConnectionConfig()
+                    {
+                        ConfigId = "framework",
+                        ConnectionString = frameworkConnection,
+                        DbType = DbType.SqlServer,
+                        IsAutoCloseConnection = true
+                    });
+                }
             }
 
             try
@@ -74,6 +86,10 @@ namespace SqlToExcel.Services
                 {
                     Db.GetConnection("source").Ado.IsValidConnection();
                     Db.GetConnection("target").Ado.IsValidConnection();
+                    if (connectionConfigs.Any(c => c.ConfigId == "framework"))
+                    {
+                        Db.GetConnection("framework").Ado.IsValidConnection();
+                    }
                 }
                 return true;
             }

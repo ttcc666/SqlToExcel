@@ -143,6 +143,21 @@ namespace SqlToExcel.ViewModels
             }
         }
 
+        private DestinationType _selectedDestination = DestinationType.Target;
+        public DestinationType SelectedDestination
+        {
+            get => _selectedDestination;
+            set
+            {
+                if (_selectedDestination != value)
+                {
+                    _selectedDestination = value;
+                    OnPropertyChanged();
+                    ReloadDestinationData();
+                }
+            }
+        }
+
         private int _maxRowCount = 5000;
         public int MaxRowCount
         {
@@ -165,6 +180,8 @@ namespace SqlToExcel.ViewModels
         public ICommand ImportJsonCommand { get; }
         public ICommand ResetCommand { get; }
         public ICommand ShowTableComparisonCommand { get; }
+        public ICommand SelectTargetDestinationCommand { get; }
+        public ICommand SelectFrameworkDestinationCommand { get; }
  
         private readonly ExcelExportService _exportService;
         private readonly ThemeService _themeService;
@@ -177,7 +194,7 @@ namespace SqlToExcel.ViewModels
             ExitCommand = new RelayCommand(p => Application.Current.Shutdown());
             ExportCommand = new RelayCommand(async p => await ExportAsync(), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery1) && !string.IsNullOrWhiteSpace(SqlQuery2));
             Preview1Command = new RelayCommand(async p => await PreviewAsync(SqlQuery1, SheetName1, "Source"), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery1));
-            Preview2Command = new RelayCommand(async p => await PreviewAsync(SqlQuery2, SheetName2, "Target"), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery2));
+            Preview2Command = new RelayCommand(async p => await PreviewAsync(SqlQuery2, SheetName2, SelectedDestination == DestinationType.Target ? "target" : "framework"), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery2));
             PreviewBothCommand = new RelayCommand(async p => await PreviewBothAsync(), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery1) && !string.IsNullOrWhiteSpace(SqlQuery2));
             OpenColumnSelectorCommand1 = new RelayCommand(p => OpenColumnSelector(1), p => SelectedTable1 != null && !IsJsonImported);
             OpenColumnSelectorCommand2 = new RelayCommand(p => OpenColumnSelector(2), p => SelectedTable2 != null && !IsJsonImported);
@@ -188,6 +205,8 @@ namespace SqlToExcel.ViewModels
             ImportJsonCommand = new RelayCommand(async p => await ImportJsonAsync(), p => !IsJsonImported);
             ResetCommand = new RelayCommand(p => ResetState(), p => IsJsonImported || IsEditMode);
             ShowTableComparisonCommand = new RelayCommand(p => OpenTableComparison());
+            SelectTargetDestinationCommand = new RelayCommand(p => SelectedDestination = DestinationType.Target);
+            SelectFrameworkDestinationCommand = new RelayCommand(p => SelectedDestination = DestinationType.Framework);
  
             LoadTableMappings();
  
@@ -228,6 +247,25 @@ namespace SqlToExcel.ViewModels
             }
         }
 
+        private void ReloadDestinationData()
+        {
+            // Clear existing destination data
+            SelectedTable2 = null;
+            SqlQuery2 = "";
+            SheetName2 = "TargetData"; // Reset sheet name
+            Tables2.Clear();
+            Columns2.Clear();
+            SortColumns2.Clear();
+            _selectedColumnNames2.Clear();
+
+            // Load new tables based on selection
+            string dbKey = SelectedDestination == DestinationType.Target ? "target" : "framework";
+            DatabaseService.Instance.GetTables(dbKey).ForEach(t => Tables2.Add(t));
+
+            // Update status or other dependent properties if necessary
+            StatusMessage = $"目标已切换为: {SelectedDestination}";
+        }
+
         private async void LoadTableMappings()
         {
             try
@@ -247,7 +285,9 @@ namespace SqlToExcel.ViewModels
             Tables1.Clear();
             Tables2.Clear();
             DatabaseService.Instance.GetTables("source").ForEach(t => Tables1.Add(t));
-            DatabaseService.Instance.GetTables("target").ForEach(t => Tables2.Add(t));
+
+            string destinationDbKey = SelectedDestination == DestinationType.Target ? "target" : "framework";
+            DatabaseService.Instance.GetTables(destinationDbKey).ForEach(t => Tables2.Add(t));
         }
 
         private void LoadColumns(int dbIndex)
@@ -285,7 +325,8 @@ namespace SqlToExcel.ViewModels
                 Columns2.Clear();
                 _selectedColumnNames2.Clear();
                 SortColumns2.Clear();
-                DatabaseService.Instance.GetColumns("target", SelectedTable2.Name).ForEach(c => Columns2.Add(new SelectableDbColumn(c)));
+                string destinationDbKey = SelectedDestination == DestinationType.Target ? "target" : "framework";
+                DatabaseService.Instance.GetColumns(destinationDbKey, SelectedTable2.Name).ForEach(c => Columns2.Add(new SelectableDbColumn(c)));
                 setDefaultSort(Columns2, SortColumns2);
             }
         }
@@ -459,7 +500,8 @@ namespace SqlToExcel.ViewModels
             StatusMessage = "正在执行查询和导出...";
             try
             {
-                if (await _exportService.ExportToExcelAsync(SqlQuery1, SheetName1, SqlQuery2, SheetName2, "All",string.Empty,string.Empty))
+                string destinationDbKey = SelectedDestination == DestinationType.Target ? "target" : "framework";
+                if (await _exportService.ExportToExcelAsync(SqlQuery1, SheetName1, SqlQuery2, SheetName2, destinationDbKey, string.Empty,string.Empty))
                 {
                     StatusMessage = "文件已成功导出。";
                 }
@@ -511,7 +553,8 @@ namespace SqlToExcel.ViewModels
             {
                 StatusMessage = "正在执行两个查询...";
                 var task1 = _exportService.GetDataTableAsync(SqlQuery1, "source");
-                var task2 = _exportService.GetDataTableAsync(SqlQuery2, "target");
+                string destinationDbKey = SelectedDestination == DestinationType.Target ? "target" : "framework";
+                var task2 = _exportService.GetDataTableAsync(SqlQuery2, destinationDbKey);
 
                 await Task.WhenAll(task1, task2);
 
@@ -598,6 +641,7 @@ namespace SqlToExcel.ViewModels
                     var config = new BatchExportConfig
                     {
                         Key = saveConfigViewModel.ConfigKey,
+                        Destination = this.SelectedDestination, // 保存目标选择
                         DataSource = new QueryConfig
                         {
                             SheetName = SheetName1,
@@ -709,6 +753,28 @@ namespace SqlToExcel.ViewModels
                     if (string.IsNullOrEmpty(mapping.old_table) || string.IsNullOrEmpty(mapping.new_table))
                     {
                         MessageBox.Show("JSON内容缺少必要的表信息。请修改后重试。", "配置错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        continue; // 返回JSON输入界面
+                    }
+
+                    // 自动检测并切换目标类型
+                    string targetTableName = mapping.new_table;
+                    if (DatabaseService.Instance.IsTableExists("target", targetTableName))
+                    {
+                        if (this.SelectedDestination != DestinationType.Target)
+                        {
+                            this.SelectedDestination = DestinationType.Target;
+                        }
+                    }
+                    else if (DatabaseService.Instance.IsTableExists("framework", targetTableName))
+                    {
+                        if (this.SelectedDestination != DestinationType.Framework)
+                        {
+                            this.SelectedDestination = DestinationType.Framework;
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show($"在目标数据库和框架库中都找不到目标表: {targetTableName}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                         continue; // 返回JSON输入界面
                     }
 

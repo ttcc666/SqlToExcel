@@ -57,12 +57,12 @@ namespace SqlToExcel.Services
             }
         }
 
-        public async Task<bool> ExportToExcelAsync(string sqlSource, string sheetNameSource, string sqlTarget, string sheetNameTarget, string exportKey, string sourceDescription, string targetDescription, string? fileName = null)
+        public async Task<bool> ExportToExcelAsync(string sqlSource, string sheetNameSource, string sqlTarget, string sheetNameTarget, string destinationDbKey, string sourceDescription, string targetDescription, string? fileName = null)
         {
             try
             {
                 var task1 = GetDataTableAsync(sqlSource, "source");
-                var task2 = GetDataTableAsync(sqlTarget, "target");
+                var task2 = GetDataTableAsync(sqlTarget, destinationDbKey);
 
                 await Task.WhenAll(task1, task2);
 
@@ -82,7 +82,7 @@ namespace SqlToExcel.Services
                     ["Comments"] = sqlLog
                 };
 
-                var defaultFileName = fileName ?? $"Export_{exportKey}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+                var defaultFileName = fileName ?? $"Export_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
                 if (SaveSheetsToFile(sheets, defaultFileName))
                 {
                     MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -369,7 +369,8 @@ namespace SqlToExcel.Services
 
                     // Execute queries
                     var task1 = GetDataTableAsync(config.DataSource.Sql, "source");
-                    var task2 = GetDataTableAsync(config.DataTarget.Sql, "target");
+                    string destinationDbKey = config.Destination == DestinationType.Target ? "target" : "framework";
+                    var task2 = GetDataTableAsync(config.DataTarget.Sql, destinationDbKey);
 
                     await Task.WhenAll(task1, task2);
 

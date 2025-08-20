@@ -38,6 +38,13 @@ namespace SqlToExcel.ViewModels
             set { _targetDescription = value; OnPropertyChanged(); }
         }
 
+        private DestinationType _destination;
+        public DestinationType Destination
+        {
+            get => _destination;
+            set { _destination = value; OnPropertyChanged(); }
+        }
+
         public EditBatchSqlViewModel(BatchExportConfig config)
         {
             _config = config;
@@ -45,6 +52,7 @@ namespace SqlToExcel.ViewModels
             _targetSql = config.DataTarget.Sql;
             _sourceDescription = config.DataSource.Description;
             _targetDescription = config.DataTarget.Description;
+            _destination = config.Destination;
         }
 
         public void SaveChanges()
@@ -53,6 +61,7 @@ namespace SqlToExcel.ViewModels
             _config.DataTarget.Sql = TargetSql;
             _config.DataSource.Description = SourceDescription;
             _config.DataTarget.Description = TargetDescription;
+            _config.Destination = Destination;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

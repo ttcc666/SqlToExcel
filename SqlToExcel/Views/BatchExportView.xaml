@@ -10,9 +10,16 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <ToolBar Grid.Row="0">
+            <Label Content="搜索:" VerticalAlignment="Center"/>
+            <TextBox Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}" MinWidth="200" Margin="0,0,10,0"
+                     hc:InfoElement.Placeholder="按键搜索" VerticalAlignment="Center" Style="{StaticResource TextBoxExtend}"/>
+            <Separator/>
+            <Button Content="刷新" Command="{Binding RefreshCommand}" ToolTip="重新加载所有配置"/>
+            <Separator/>
             <Button Content="导出配置" Command="{Binding ExportConfigsCommand}" ToolTip="将所有配置导出到一个JSON文件"/>
             <Button Content="导入配置" Command="{Binding ImportConfigCommand}" ToolTip="从JSON文件或文本导入配置"/>
             <Separator/>
@@ -24,7 +31,7 @@
             <TextBlock Text="{Binding SelectedCountText}" VerticalAlignment="Center" Margin="10,0,0,0"/>
         </ToolBar>
 
-        <DataGrid Grid.Row="1" ItemsSource="{Binding Items}" AutoGenerateColumns="False" IsReadOnly="False" x:Name="dataGrid">
+        <DataGrid Grid.Row="1" ItemsSource="{Binding FilteredItems}" AutoGenerateColumns="False" IsReadOnly="False" x:Name="dataGrid">
             <DataGrid.Columns>
                 <DataGridTemplateColumn Header="选择" Width="60">
                     <DataGridTemplateColumn.CellTemplate>
@@ -71,5 +78,11 @@
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
+
+        <StatusBar Grid.Row="2">
+            <StatusBarItem>
+                <TextBlock Text="{Binding TotalCountText}" Margin="5,0"/>
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </UserControl>

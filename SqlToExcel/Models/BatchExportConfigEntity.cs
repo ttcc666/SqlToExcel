@@ -18,6 +18,9 @@ namespace SqlToExcel.Models
         /// </summary>
         public string DataTargetJson { get; set; } = null!;
 
+        public DestinationType Destination { get; set; }
+
+        [SugarColumn(IsNullable =true)]
         public string Prefix { get; set; } = string.Empty;
     }
 }

@@ -48,5 +48,17 @@ namespace SqlToExcel.Properties {
                 this["TargetConnectionString"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string FrameworkConnectionString {
+            get {
+                return ((string)(this["FrameworkConnectionString"]));
+            }
+            set {
+                this["FrameworkConnectionString"] = value;
+            }
+        }
     }
 }

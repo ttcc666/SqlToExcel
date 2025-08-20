@@ -137,6 +137,7 @@ namespace SqlToExcel.Services
                 Key = model.Key,
                 DataSourceJson = JsonSerializer.Serialize(model.DataSource),
                 DataTargetJson = JsonSerializer.Serialize(model.DataTarget),
+                Destination = model.Destination,
                 Prefix = model.Prefix
             };
         }
@@ -148,6 +149,7 @@ namespace SqlToExcel.Services
                 Key = entity.Key,
                 DataSource = JsonSerializer.Deserialize<QueryConfig>(entity.DataSourceJson) ?? new QueryConfig(),
                 DataTarget = JsonSerializer.Deserialize<QueryConfig>(entity.DataTargetJson) ?? new QueryConfig(),
+                Destination = entity.Destination,
                 Prefix = entity.Prefix
             };
         }

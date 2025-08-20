@@ -85,10 +85,40 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <StackPanel Orientation="Horizontal" Margin="5">
+
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5">
+                                    <TextBlock Text="目标类型:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <RadioButton GroupName="Destination" Content="目标数据库" VerticalAlignment="Center" Margin="0,0,10,0" Command="{Binding SelectTargetDestinationCommand}">
+                                        <RadioButton.Style>
+                                            <Style TargetType="RadioButton" BasedOn="{StaticResource RadioButtonBaseStyle}">
+                                                <Setter Property="IsChecked" Value="False" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedDestination}" Value="Target">
+                                                        <Setter Property="IsChecked" Value="True" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </RadioButton.Style>
+                                    </RadioButton>
+                                    <RadioButton GroupName="Destination" Content="框架库" VerticalAlignment="Center" Command="{Binding SelectFrameworkDestinationCommand}">
+                                        <RadioButton.Style>
+                                            <Style TargetType="RadioButton" BasedOn="{StaticResource RadioButtonBaseStyle}">
+                                                <Setter Property="IsChecked" Value="False" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedDestination}" Value="Framework">
+                                                        <Setter Property="IsChecked" Value="True" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </RadioButton.Style>
+                                    </RadioButton>
+                                </StackPanel>
+                                
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5">
                                     <TextBlock Text="选择表:" VerticalAlignment="Center" />
                                     <hc:ComboBox ItemsSource="{Binding Tables2View}" SelectedItem="{Binding SelectedTable2}" Text="{Binding SearchText2, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Name" Width="200" Margin="5,0" IsEditable="True" IsTextSearchEnabled="True" />
                                     <Button Content="选择列" Command="{Binding OpenColumnSelectorCommand2}" Margin="5" hc:IconElement.Geometry="{StaticResource App.PlaylistEdit}" />
@@ -97,10 +127,10 @@
 
                                 <hc:Divider Grid.Row="2" Margin="5" />
 
-                                <hc:TextBox Grid.Row="2" Text="{Binding SqlQuery2, UpdateSourceTrigger=PropertyChanged}"
+                                <hc:TextBox Grid.Row="3" Text="{Binding SqlQuery2, UpdateSourceTrigger=PropertyChanged}"
                                          AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Margin="5"
                                          FontFamily="Consolas" VerticalContentAlignment="Top" />
-                                <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="5">
+                                <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="5">
                                     <TextBlock Text="Sheet 名称:" VerticalAlignment="Center" />
                                     <hc:TextBox Text="{Binding SheetName2, UpdateSourceTrigger=PropertyChanged}" Width="200" Margin="5,0" />
                                     <Button Content="预览" Command="{Binding Preview2Command}" Style="{StaticResource ButtonPrimary}" hc:IconElement.Geometry="{StaticResource App.Eye}" />

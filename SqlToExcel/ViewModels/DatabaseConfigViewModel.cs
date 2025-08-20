@@ -23,8 +23,17 @@ namespace SqlToExcel.ViewModels
             set { _targetConnectionString = value; OnPropertyChanged(); }
         }
 
+        private string _frameworkConnectionString = string.Empty;
+        public string FrameworkConnectionString
+        {
+            get => _frameworkConnectionString;
+            set { _frameworkConnectionString = value; OnPropertyChanged(); }
+        }
+
+
         public ICommand TestSourceConnectionCommand { get; }
         public ICommand TestTargetConnectionCommand { get; }
+        public ICommand TestFrameworkConnectionCommand { get; }
         public ICommand SaveCommand { get; }
 
         public DatabaseConfigViewModel()
@@ -32,9 +41,11 @@ namespace SqlToExcel.ViewModels
             // Load existing settings if available
             SourceConnectionString = Properties.Settings.Default.SourceConnectionString ?? string.Empty;
             TargetConnectionString = Properties.Settings.Default.TargetConnectionString ?? string.Empty;
+            FrameworkConnectionString = Properties.Settings.Default.FrameworkConnectionString ?? string.Empty;
 
             TestSourceConnectionCommand = new RelayCommand(p => TestConnection(SourceConnectionString, "源"));
             TestTargetConnectionCommand = new RelayCommand(p => TestConnection(TargetConnectionString, "目标"));
+            TestFrameworkConnectionCommand = new RelayCommand(p => TestConnection(FrameworkConnectionString, "框架库"));
             SaveCommand = new RelayCommand(p => SaveConfiguration(p as Window));
         }
 
@@ -74,6 +85,7 @@ namespace SqlToExcel.ViewModels
         {
             Properties.Settings.Default.SourceConnectionString = SourceConnectionString;
             Properties.Settings.Default.TargetConnectionString = TargetConnectionString;
+            Properties.Settings.Default.FrameworkConnectionString = FrameworkConnectionString;
             Properties.Settings.Default.Save();
 
             MessageBox.Show("配置已保存。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);

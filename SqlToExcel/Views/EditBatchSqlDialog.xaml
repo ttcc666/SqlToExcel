@@ -29,7 +29,7 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <hc:SimpleText Grid.Row="0" Text="描述"/>
-                <TextBox Grid.Row="1" Text="{Binding SourceDescription, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MaxLength="100" Margin="0,2,0,5"/>
+                <TextBox Grid.Row="1" Text="{Binding SourceDescription, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MaxLength="500" Margin="0,2,0,5"/>
                 <hc:SimpleText Grid.Row="2" Text="SQL"/>
                 <TextBox Grid.Row="3" Text="{Binding SourceSql, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,2,0,0"/>
             </Grid>
@@ -41,12 +41,40 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <hc:SimpleText Grid.Row="0" Text="描述"/>
-                <TextBox Grid.Row="1" Text="{Binding TargetDescription, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MaxLength="100" Margin="0,2,0,5"/>
-                <hc:SimpleText Grid.Row="2" Text="SQL"/>
-                <TextBox Grid.Row="3" Text="{Binding TargetSql, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,2,0,0"/>
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,2,0,5">
+                    <TextBlock Text="目标类型:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <RadioButton GroupName="Destination" Content="目标数据库" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <RadioButton.Style>
+                            <Style TargetType="RadioButton" BasedOn="{StaticResource RadioButtonBaseStyle}">
+                                <Setter Property="IsChecked" Value="False" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Destination}" Value="Target">
+                                        <Setter Property="IsChecked" Value="True" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </RadioButton.Style>
+                    </RadioButton>
+                    <RadioButton GroupName="Destination" Content="框架库" VerticalAlignment="Center">
+                        <RadioButton.Style>
+                            <Style TargetType="RadioButton" BasedOn="{StaticResource RadioButtonBaseStyle}">
+                                <Setter Property="IsChecked" Value="False" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Destination}" Value="Framework">
+                                        <Setter Property="IsChecked" Value="True" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </RadioButton.Style>
+                    </RadioButton>
+                </StackPanel>
+                <hc:SimpleText Grid.Row="1" Text="描述"/>
+                <TextBox Grid.Row="2" Text="{Binding TargetDescription, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MaxLength="200" Margin="0,2,0,5"/>
+                <hc:SimpleText Grid.Row="3" Text="SQL"/>
+                <TextBox Grid.Row="4" Text="{Binding TargetSql, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,2,0,0"/>
             </Grid>
         </GroupBox>
 
