@@ -3,7 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 using System.Windows;
 
 namespace SqlToExcel.Services
@@ -46,7 +48,8 @@ namespace SqlToExcel.Services
                 var json = File.ReadAllText(ConfigFileName);
                 var options = new JsonSerializerOptions
                 {
-                    PropertyNameCaseInsensitive = true
+                    PropertyNameCaseInsensitive = true,
+                    Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
                 };
                 return JsonSerializer.Deserialize<List<BatchExportConfig>>(json, options) ?? new List<BatchExportConfig>();
             }
@@ -137,7 +140,8 @@ namespace SqlToExcel.Services
             var options = new JsonSerializerOptions
             {
                 WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
             
             var json = JsonSerializer.Serialize(configs, options);

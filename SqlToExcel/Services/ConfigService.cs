@@ -3,7 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -100,7 +102,8 @@ namespace SqlToExcel.Services
                 var options = new JsonSerializerOptions
                 {
                     WriteIndented = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
                 };
                 var json = JsonSerializer.Serialize(configs, options);
                 await File.WriteAllTextAsync(filePath, json);
@@ -132,11 +135,16 @@ namespace SqlToExcel.Services
 
         private BatchExportConfigEntity MapToEntity(BatchExportConfig model)
         {
+            var options = new JsonSerializerOptions
+            {
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+
             return new BatchExportConfigEntity
             {
                 Key = model.Key,
-                DataSourceJson = JsonSerializer.Serialize(model.DataSource),
-                DataTargetJson = JsonSerializer.Serialize(model.DataTarget),
+                DataSourceJson = JsonSerializer.Serialize(model.DataSource, options),
+                DataTargetJson = JsonSerializer.Serialize(model.DataTarget, options),
                 Destination = model.Destination,
                 Prefix = model.Prefix
             };
@@ -144,11 +152,16 @@ namespace SqlToExcel.Services
 
         private BatchExportConfig MapToModel(BatchExportConfigEntity entity)
         {
+            var options = new JsonSerializerOptions
+            {
+                Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
+            };
+
             return new BatchExportConfig
             {
                 Key = entity.Key,
-                DataSource = JsonSerializer.Deserialize<QueryConfig>(entity.DataSourceJson) ?? new QueryConfig(),
-                DataTarget = JsonSerializer.Deserialize<QueryConfig>(entity.DataTargetJson) ?? new QueryConfig(),
+                DataSource = JsonSerializer.Deserialize<QueryConfig>(entity.DataSourceJson, options) ?? new QueryConfig(),
+                DataTarget = JsonSerializer.Deserialize<QueryConfig>(entity.DataTargetJson, options) ?? new QueryConfig(),
                 Destination = entity.Destination,
                 Prefix = entity.Prefix
             };

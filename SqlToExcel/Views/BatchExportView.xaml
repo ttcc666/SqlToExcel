@@ -17,6 +17,7 @@
             <Label Content="搜索:" VerticalAlignment="Center"/>
             <TextBox Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}" MinWidth="200" Margin="0,0,10,0"
                      hc:InfoElement.Placeholder="按键搜索" VerticalAlignment="Center" Style="{StaticResource TextBoxExtend}"/>
+            <ToggleButton Content="仅显示无描述" IsChecked="{Binding ShowOnlyMissingDescription, Mode=TwoWay}" VerticalAlignment="Center" Margin="5,0,5,0"/>
             <Separator/>
             <Button Content="刷新" Command="{Binding RefreshCommand}" ToolTip="重新加载所有配置"/>
             <Button Content="导出配置" Command="{Binding ExportConfigsCommand}" ToolTip="将所有配置导出到一个JSON文件"/>

@@ -56,6 +56,19 @@ namespace SqlToExcel.ViewModels
             }
         }
 
+        private bool _showOnlyMissingDescription;
+        public bool ShowOnlyMissingDescription
+        {
+            get => _showOnlyMissingDescription;
+            set
+            {
+                if (_showOnlyMissingDescription == value) return;
+                _showOnlyMissingDescription = value;
+                OnPropertyChanged();
+                FilteredItems.Refresh();
+            }
+        }
+
         private bool _isBatchExporting;
         public bool IsBatchExporting
         {
@@ -79,6 +92,7 @@ namespace SqlToExcel.ViewModels
         public ICommand SelectAllCommand { get; }
         public ICommand ClearSelectionCommand { get; }
         public ICommand RefreshCommand { get; }
+        public ICommand FindMissingDescriptionCommand { get; }
 
         public string SelectedCountText => $"已选择 {FilteredItems.Cast<object>().Count(x => ((BatchExportConfigItemViewModel)x).IsSelected)} 项";
 
@@ -110,6 +124,7 @@ namespace SqlToExcel.ViewModels
             SelectAllCommand = new RelayCommand(_ => SelectAll(), _ => !IsBatchExporting);
             ClearSelectionCommand = new RelayCommand(_ => ClearSelection(), _ => !IsBatchExporting);
             RefreshCommand = new RelayCommand(async _ => await ReloadConfigsAsync(), _ => !IsBatchExporting);
+            FindMissingDescriptionCommand = new RelayCommand(_ => ShowOnlyMissingDescription = !ShowOnlyMissingDescription);
 
             _configService.ConfigsChanged += OnConfigsChanged;
             _ = LoadConfigsAsync();
@@ -123,12 +138,20 @@ namespace SqlToExcel.ViewModels
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(SearchKeyword))
+            bool keywordMatch = true;
+            if (!string.IsNullOrWhiteSpace(SearchKeyword))
             {
-                return true;
+                keywordMatch = item.Key.Contains(SearchKeyword, StringComparison.OrdinalIgnoreCase);
             }
 
-            return item.Key.Contains(SearchKeyword, StringComparison.OrdinalIgnoreCase);
+            bool missingDescriptionMatch = true;
+            if (ShowOnlyMissingDescription)
+            {
+                missingDescriptionMatch = string.IsNullOrWhiteSpace(item.Config.DataSource.Description) ||
+                                          string.IsNullOrWhiteSpace(item.Config.DataTarget.Description);
+            }
+
+            return keywordMatch && missingDescriptionMatch;
         }
 
         private void InitializeDebounceTimer()
