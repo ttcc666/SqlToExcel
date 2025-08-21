@@ -4,18 +4,45 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SqlToExcel.Views"
+        xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase"
         mc:Ignorable="d"
-        Title="行验证结果" Height="450" Width="800"
+        Title="行验证结果" Height="600" Width="900"
         WindowStartupLocation="CenterOwner">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="{Binding Summary}" FontWeight="Bold" Margin="5"/>
+        <TextBlock Grid.Row="0" Text="{Binding Summary}" FontWeight="Bold" Margin="5" TextWrapping="Wrap"/>
 
-        <DataGrid Grid.Row="1" ItemsSource="{Binding Results}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" Margin="5">
+        <DataGrid Grid.Row="1" ItemsSource="{Binding ResultsView}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" Margin="5">
+            <DataGrid.GroupStyle>
+                <GroupStyle>
+                    <GroupStyle.ContainerStyle>
+                        <Style TargetType="{x:Type GroupItem}">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type GroupItem}">
+                                        <Expander IsExpanded="True">
+                                            <Expander.Header>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock FontWeight="Bold" Text="{Binding Name}" Margin="5,0"/>
+                                                    <TextBlock Text="("/>
+                                                    <TextBlock Text="{Binding ItemCount}"/>
+                                                    <TextBlock Text=" 处不一致)"/>
+                                                </StackPanel>
+                                            </Expander.Header>
+                                            <ItemsPresenter />
+                                        </Expander>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </GroupStyle.ContainerStyle>
+                </GroupStyle>
+            </DataGrid.GroupStyle>
             <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow">
                     <Style.Triggers>
@@ -31,5 +58,11 @@
                 <DataGridTextColumn Header="目标数据" Binding="{Binding TargetValue}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
+            <Button Content="上一页" Command="{Binding PreviousPageCommand}" Margin="0,0,10,0"/>
+            <TextBlock Text="{Binding PageInfo}" VerticalAlignment="Center"/>
+            <Button Content="下一页" Command="{Binding NextPageCommand}" Margin="10,0,0,0"/>
+        </StackPanel>
     </Grid>
 </Window>
