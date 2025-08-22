@@ -2,16 +2,19 @@ namespace SqlToExcel.Models
 {
     public class ValidationResultItem
     {
-        public string ColumnName { get; set; }
+        public string DisplayColumnName { get; set; }
+        public string SourceColumnName { get; set; }
+        public string TargetColumnName { get; set; }
         public string SourceValue { get; set; }
         public string TargetValue { get; set; }
         public bool IsMatch { get; set; }
         public string GroupName { get; set; } // To group by row, for example
 
-        // Constructor updated to include an optional groupName parameter
-        public ValidationResultItem(string columnName, string sourceValue, string targetValue, string groupName = null)
+        public ValidationResultItem(string sourceColumnName, string targetColumnName, string sourceValue, string targetValue, string groupName = null)
         {
-            ColumnName = columnName;
+            SourceColumnName = sourceColumnName;
+            TargetColumnName = targetColumnName;
+            DisplayColumnName = $"{(string.IsNullOrEmpty(sourceColumnName) ? "(空)" : sourceColumnName)} / {(string.IsNullOrEmpty(targetColumnName) ? "(空)" : targetColumnName)}";
             SourceValue = sourceValue;
             TargetValue = targetValue;
             IsMatch = sourceValue == targetValue;
@@ -19,3 +22,4 @@ namespace SqlToExcel.Models
         }
     }
 }
+

@@ -1,4 +1,5 @@
 using SqlToExcel.Models;
+using SqlToExcel.Services;
 using SqlToExcel.Views;
 using System;
 using System.Collections.Generic;
@@ -17,6 +18,7 @@ namespace SqlToExcel.ViewModels
     {
         public DataTable Data1 { get; }
         public DataTable Data2 { get; }
+        private readonly ExcelExportService _excelExportService;
         public int RecordCount1 => Data1.Rows.Count;
         public int RecordCount2 => Data2.Rows.Count;
 
@@ -39,10 +41,11 @@ namespace SqlToExcel.ViewModels
         public ICommand ValidateAllCommand { get; }
         public ICommand ConfigureValidationCommand { get; }
 
-        public DualPreviewViewModel(DataTable data1, DataTable data2)
+        public DualPreviewViewModel(DataTable data1, DataTable data2, ExcelExportService excelExportService)
         {
             Data1 = data1;
             Data2 = data2;
+            _excelExportService = excelExportService;
 
             ValidateFirstRowCommand = new RelayCommand(p => ValidateRows(0), p => CanValidate());
             ValidateMiddleRowCommand = new RelayCommand(p => ValidateRows(RecordCount1 / 2), p => CanValidate());
@@ -94,51 +97,58 @@ namespace SqlToExcel.ViewModels
             var results = new ObservableCollection<ValidationResultItem>();
             string summary;
             int totalMismatchCount = 0;
+            var rowsWithMismatches = new HashSet<int>();
+            int comparedColumnCount = 0;
 
             try
             {
                 await Task.Run(() =>
                 {
                     int rowCount = Math.Min(RecordCount1, RecordCount2);
+                    int colCount = Math.Min(Data1.Columns.Count, Data2.Columns.Count);
+                    var includedColumns = Data1.Columns.Cast<DataColumn>()
+                                               .Select(c => c.ColumnName)
+                                               .Where(c => !ExcludedColumns.Contains(c))
+                                               .ToList();
+                    comparedColumnCount = includedColumns.Count;
+
                     for (int rowIndex = 0; rowIndex < rowCount; rowIndex++)
                     {
                         var row1 = Data1.Rows[rowIndex];
                         var row2 = Data2.Rows[rowIndex];
+                        bool rowHasMismatch = false;
 
-                        foreach (DataColumn col in Data1.Columns)
+                        for (int i = 0; i < colCount; i++)
                         {
-                            var colName = col.ColumnName;
-                            if (ExcludedColumns.Contains(colName)) continue;
+                            var sourceColName = Data1.Columns[i].ColumnName;
+                            var targetColName = Data2.Columns[i].ColumnName;
+                            if (ExcludedColumns.Contains(targetColName)) continue;
 
-                            var value1 = row1[colName]?.ToString() ?? "(null)";
-                            string value2;
-
-                            if (Data2.Columns.Contains(colName))
-                            {
-                                value2 = row2[colName]?.ToString() ?? "(null)";
-                            }
-                            else
-                            {
-                                value2 = "(列不存在)";
-                            }
+                            var value1 = row1[i]?.ToString() ?? "(null)";
+                            var value2 = row2[i]?.ToString() ?? "(null)";
 
                             if (value1 != value2)
                             {
                                 totalMismatchCount++;
-                                var resultItem = new ValidationResultItem(colName, value1, value2, $"第 {rowIndex + 1} 行");
+                                rowHasMismatch = true;
+                                var resultItem = new ValidationResultItem(sourceColName, targetColName, value1, value2, $"第 {rowIndex + 1} 行");
                                 results.Add(resultItem);
                             }
+                        }
+                        if (rowHasMismatch)
+                        {
+                            rowsWithMismatches.Add(rowIndex);
                         }
                     }
                 });
 
                 if (totalMismatchCount == 0)
                 {
-                    summary = $"验证通过：所有 {RecordCount1} 行数据（已排除的列除外）完全一致。";
+                    summary = $"验证通过！共比较 {RecordCount1} 行，{comparedColumnCount} 列。所有数据（已排除的列除外）完全一致。";
                 }
                 else
                 {
-                    summary = $"验证完成：共发现 {totalMismatchCount} 处不一致。";
+                    summary = $"验证完成。共比较 {RecordCount1} 行，{comparedColumnCount} 列。在 {rowsWithMismatches.Count} 行中发现 {totalMismatchCount} 处不一致。";
                 }
             }
             catch (Exception ex)
@@ -152,7 +162,7 @@ namespace SqlToExcel.ViewModels
 
             Application.Current.Dispatcher.Invoke(() =>
             {
-                var viewModel = new ValidationResultViewModel(results, summary);
+                var viewModel = new ValidationResultViewModel(results, summary, _excelExportService);
                 var view = new ValidationResultView
                 {
                     DataContext = viewModel,
@@ -176,25 +186,23 @@ namespace SqlToExcel.ViewModels
                 var row1 = Data1.Rows[rowIndex];
                 var row2 = Data2.Rows[rowIndex];
                 int mismatchCount = 0;
+                int colCount = Math.Min(Data1.Columns.Count, Data2.Columns.Count);
+                var includedColumns = Data1.Columns.Cast<DataColumn>()
+                                           .Select(c => c.ColumnName)
+                                           .Where(c => !ExcludedColumns.Contains(c))
+                                           .ToList();
+                int comparedColumnCount = includedColumns.Count;
 
-                for (int i = 0; i < Data1.Columns.Count; i++)
+                for (int i = 0; i < colCount; i++)
                 {
-                    var colName = Data1.Columns[i].ColumnName;
-                    if (ExcludedColumns.Contains(colName)) continue;
+                    var sourceColName = Data1.Columns[i].ColumnName;
+                    var targetColName = Data2.Columns[i].ColumnName;
+                    if (ExcludedColumns.Contains(targetColName)) continue;
 
                     var value1 = row1[i]?.ToString() ?? "(null)";
-                    string value2;
-                    
-                    if (Data2.Columns.Contains(colName))
-                    {
-                        value2 = row2[colName]?.ToString() ?? "(null)";
-                    }
-                    else
-                    {
-                        value2 = "(列不存在)";
-                    }
+                    var value2 = row2[i]?.ToString() ?? "(null)";
 
-                    var resultItem = new ValidationResultItem(colName, value1, value2);
+                    var resultItem = new ValidationResultItem(sourceColName, targetColName, value1, value2, $"第 {rowIndex + 1} 行");
                     results.Add(resultItem);
 
                     if (!resultItem.IsMatch)
@@ -205,15 +213,15 @@ namespace SqlToExcel.ViewModels
 
                 if (mismatchCount == 0)
                 {
-                    summary = $"验证通过：基于源列顺序的第 {rowIndex + 1} 行数据（已排除的列除外）完全一致。";
+                    summary = $"验证通过！第 {rowIndex + 1} 行的 {comparedColumnCount} 列数据（已排除的列除外）完全一致。";
                 }
                 else
                 {
-                    summary = $"验证完成：基于源列顺序的第 {rowIndex + 1} 行发现 {mismatchCount} 处不一致。";
+                    summary = $"验证完成。在第 {rowIndex + 1} 行的 {comparedColumnCount} 列中发现 {mismatchCount} 处不一致。";
                 }
             }
 
-            var viewModel = new ValidationResultViewModel(results, summary);
+            var viewModel = new ValidationResultViewModel(results, summary, _excelExportService);
             var view = new ValidationResultView
             {
                 DataContext = viewModel,

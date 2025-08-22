@@ -563,7 +563,7 @@ namespace SqlToExcel.ViewModels
 
                 StatusMessage = "查询完成，正在打开组合预览窗口...";
 
-                var dualViewModel = new DualPreviewViewModel(dt1, dt2);
+                var dualViewModel = new DualPreviewViewModel(dt1, dt2, _exportService);
                 var dualView = new DualPreviewView
                 {
                     DataContext = dualViewModel,

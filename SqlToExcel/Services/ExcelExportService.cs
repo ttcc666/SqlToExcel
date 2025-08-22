@@ -188,6 +188,90 @@ namespace SqlToExcel.Services
             }
         }
 
+        public async Task<bool> ExportValidationResultsToExcelAsync(IEnumerable<ValidationRowResultViewModel> validationResults)
+        {
+            try
+            {
+                var saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "Excel Files|*.xlsx",
+                    Title = "保存验证结果 Excel 文件",
+                    FileName = $"ValidationResults_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx"
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    using (var package = new ExcelPackage())
+                    {
+                        var worksheet = package.Workbook.Worksheets.Add("Validation Report");
+                        int rowIdx = 1;
+
+                        // Overall Summary (optional, but good to have)
+                        // worksheet.Cells[rowIdx, 1].Value = "Validation Summary:";
+                        // worksheet.Cells[rowIdx, 1].Style.Font.Bold = true;
+                        // rowIdx++;
+                        // worksheet.Cells[rowIdx, 1].Value = "Total Rows Compared: ...";
+                        // rowIdx++;
+                        // ...
+
+                        foreach (var rowResult in validationResults)
+                        {
+                            // Add a blank row for spacing between groups
+                            if (rowIdx > 1) rowIdx++; 
+
+                            // Group Header: Row Name and Summary
+                            worksheet.Cells[rowIdx, 1].Value = rowResult.GroupName;
+                            worksheet.Cells[rowIdx, 1].Style.Font.Bold = true;
+                            worksheet.Cells[rowIdx, 1].Style.Font.Size = 12;
+                            worksheet.Cells[rowIdx, 2].Value = rowResult.MismatchedColumnsSummary;
+                            worksheet.Cells[rowIdx, 2].Style.Font.Italic = true;
+                            worksheet.Cells[rowIdx, 2].Style.Font.Size = 10;
+                            rowIdx++;
+
+                            // Mismatch Details Header
+                            worksheet.Cells[rowIdx, 1].Value = "字段名";
+                            worksheet.Cells[rowIdx, 2].Value = "源数据";
+                            worksheet.Cells[rowIdx, 3].Value = "目标数据";
+                            var headerRange = worksheet.Cells[rowIdx, 1, rowIdx, 3];
+                            headerRange.Style.Font.Bold = true;
+                            headerRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                            headerRange.Style.Fill.BackgroundColor.SetColor(Color.LightGray);
+                            rowIdx++;
+
+                            // Mismatch Details
+                            foreach (var mismatch in rowResult.Mismatches)
+                            {
+                                worksheet.Cells[rowIdx, 1].Value = mismatch.DisplayColumnName;
+                                worksheet.Cells[rowIdx, 2].Value = mismatch.SourceValue;
+                                worksheet.Cells[rowIdx, 3].Value = mismatch.TargetValue;
+
+                                if (!mismatch.IsMatch)
+                                {
+                                    var rowRange = worksheet.Cells[rowIdx, 1, rowIdx, 3];
+                                    rowRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                                    rowRange.Style.Fill.BackgroundColor.SetColor(ColorTranslator.FromHtml("#FFCDD2")); // Light Red
+                                }
+                                rowIdx++;
+                            }
+                        }
+
+                        // Auto-fit columns and set default row height
+                        worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
+                        worksheet.DefaultRowHeight = 20;
+
+                        await File.WriteAllBytesAsync(saveFileDialog.FileName, package.GetAsByteArray());
+                    }
+                    
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"导出验证结果时发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            return false;
+        }
+
         public async Task<bool> BatchExportToFolderAsync(
             IEnumerable<BatchExportConfig> configs,
             string targetFolder,

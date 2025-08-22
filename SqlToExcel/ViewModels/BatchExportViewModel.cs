@@ -266,7 +266,7 @@ namespace SqlToExcel.ViewModels
                 DataTable dt1 = task1.Result;
                 DataTable dt2 = task2.Result;
 
-                var dualViewModel = new DualPreviewViewModel(dt1, dt2);
+                var dualViewModel = new DualPreviewViewModel(dt1, dt2, _exportService);
                 var dualView = new DualPreviewView
                 {
                     DataContext = dualViewModel,
