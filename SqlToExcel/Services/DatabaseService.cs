@@ -271,5 +271,47 @@ namespace SqlToExcel.Services
             var tables = await System.Threading.Tasks.Task.Run(() => db.DbMaintenance.GetTableInfoList(false));
             return tables?.Where(t=> !t.Name.StartsWith("_") && !Regex.IsMatch(t.Name,"[0-9]+")).Select(t => t.Name).ToList() ?? new List<string>();
         }
+
+        public async Task<List<string>> GetPrimaryKeysAsync(string dbKey, string tableName)
+        {
+            var db = GetDbConnection(dbKey);
+            if (db == null || !await Task.Run(() => IsTableExists(dbKey, tableName)))
+            {
+                return new List<string>();
+            }
+            // GetPrimaries is sync, but we run it in a task to not block the UI thread
+            return await Task.Run(() => db.DbMaintenance.GetPrimaries(tableName));
+        }
+
+        public async Task<List<IndexDetail>> GetIndexDetailsAsync(string dbKey, string tableName)
+        {
+            var db = GetDbConnection(dbKey);
+            if (db == null || !await Task.Run(() => IsTableExists(dbKey, tableName)))
+            {
+                return new List<IndexDetail>();
+            }
+
+            string sql = @"
+            SELECT 
+                i.name AS IndexName,
+                c.name AS ColumnName,
+                i.type_desc AS IndexType,
+                ic.is_included_column AS IsIncludedColumn
+            FROM 
+                sys.indexes AS i
+            INNER JOIN 
+                sys.index_columns AS ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+            INNER JOIN 
+                sys.columns AS c ON ic.object_id = c.object_id AND c.column_id = ic.column_id
+            INNER JOIN 
+                sys.tables AS t ON i.object_id = t.object_id
+            WHERE 
+                t.name = @tableName
+            ORDER BY 
+                i.name, ic.key_ordinal;
+            ";
+
+            return await db.Ado.SqlQueryAsync<IndexDetail>(sql, new { tableName });
+        }
     }
 }

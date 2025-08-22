@@ -159,5 +159,35 @@ namespace SqlToExcel.Services
         {
             OnConfigsChanged();
         }
+
+        public IEnumerable<TableMapping> ImportTableMappings(string filePath)
+        {
+            try
+            {
+                var json = File.ReadAllText(filePath);
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                };
+                var jsonMappings = JsonSerializer.Deserialize<List<JsonTableMapping>>(json, options);
+
+                if (jsonMappings == null)
+                {
+                    return Enumerable.Empty<TableMapping>();
+                }
+
+                return jsonMappings.DistinctBy(jm => new { jm.source_table, jm.target_table })
+                                 .Select(jm => new TableMapping
+                {
+                    SourceTable = jm.source_table,
+                    TargetTable = jm.target_table
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"导入映射配置时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                return Enumerable.Empty<TableMapping>();
+            }
+        }
     }
 }

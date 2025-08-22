@@ -11,12 +11,16 @@
         <vm:TableMappingViewModel/>
     </UserControl.DataContext>
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Column="0" Margin="10">
+        <StackPanel Grid.Row="0" Grid.Column="0" Margin="10">
             <TextBlock Text="源表:" FontWeight="Bold"/>
             <ComboBox ItemsSource="{Binding AvailableSourceTables}"
                       SelectedItem="{Binding SelectedSourceTable}"
@@ -29,10 +33,13 @@
                       DisplayMemberPath="Name"
                       Width="200" Margin="0,0,0,10"/>
 
-            <Button Content="保存映射" Command="{Binding SaveMappingCommand}" Width="100" HorizontalAlignment="Left"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <Button Content="保存映射" Command="{Binding SaveMappingCommand}" Width="100" HorizontalAlignment="Left"/>
+                <Button Content="导入配置" Command="{Binding ImportCommand}" Width="100" HorizontalAlignment="Left" Margin="10,0,0,0"/>
+            </StackPanel>
         </StackPanel>
 
-        <DataGrid Grid.Column="1" ItemsSource="{Binding MappedTables}" AutoGenerateColumns="False" CanUserAddRows="False" Margin="10">
+        <DataGrid Grid.Row="0" Grid.Column="1" ItemsSource="{Binding MappedTables}" AutoGenerateColumns="False" CanUserAddRows="False" Margin="10">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="源表" Binding="{Binding SourceTable}" Width="*"/>
                 <DataGridTextColumn Header="目标表" Binding="{Binding TargetTable}" Width="*"/>
@@ -46,5 +53,7 @@
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
+
+        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding MappedTablesCount, StringFormat='总数: {0}'}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,5,10,5" FontWeight="Bold"/>
     </Grid>
 </UserControl>

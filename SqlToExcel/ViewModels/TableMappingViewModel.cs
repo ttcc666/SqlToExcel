@@ -7,6 +7,8 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Microsoft.Win32;
+using System;
 
 namespace SqlToExcel.ViewModels
 {
@@ -14,10 +16,13 @@ namespace SqlToExcel.ViewModels
     {
         private readonly ConfigService _configService;
         private readonly DatabaseService _databaseService;
+        private readonly ConfigFileService _configFileService;
 
         public ObservableCollection<DbTableInfo> AvailableSourceTables { get; } = new ObservableCollection<DbTableInfo>();
         public ObservableCollection<DbTableInfo> AvailableTargetTables { get; } = new ObservableCollection<DbTableInfo>();
         public ObservableCollection<TableMapping> MappedTables { get; } = new ObservableCollection<TableMapping>();
+
+        public int MappedTablesCount => MappedTables.Count;
 
         private DbTableInfo _selectedSourceTable;
         public DbTableInfo SelectedSourceTable
@@ -35,16 +40,48 @@ namespace SqlToExcel.ViewModels
 
         public ICommand SaveMappingCommand { get; }
         public ICommand DeleteMappingCommand { get; }
+        public ICommand ImportCommand { get; }
 
         public TableMappingViewModel()
         {
             _configService = ConfigService.Instance;
             _databaseService = DatabaseService.Instance;
+            _configFileService = ConfigFileService.Instance;
 
             SaveMappingCommand = new RelayCommand(async p => await SaveMappingAsync(), p => SelectedSourceTable != null && SelectedTargetTable != null);
             DeleteMappingCommand = new RelayCommand(async p => await DeleteMappingAsync(p));
+            ImportCommand = new RelayCommand(async p => await ImportMappingsAsync());
 
+            MappedTables.CollectionChanged += (s, e) => OnPropertyChanged(nameof(MappedTablesCount));
+
+            EventService.Subscribe<MappingsChangedEvent>(async e => await LoadDataAsync());
             _ = LoadDataAsync();
+        }
+
+        private async Task ImportMappingsAsync()
+        {
+            var openFileDialog = new OpenFileDialog
+            {
+                Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+                Title = "选择要导入的配置文件"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    var mappings = _configFileService.ImportTableMappings(openFileDialog.FileName);
+                    if (mappings.Any())
+                    {
+                        await _configService.SaveAllTableMappingsAsync(mappings);
+                        // LoadDataAsync will be called by the MappingsChangedEvent
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show($"导入失败: {ex.Message}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                }
+            }
         }
 
         private async Task LoadDataAsync()

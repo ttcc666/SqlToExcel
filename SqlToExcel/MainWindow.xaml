@@ -157,6 +157,9 @@
             <TabItem Header="表映射配置">
                 <views:TableMappingView/>
             </TabItem>
+            <TabItem Header="主键/索引对比">
+                <views:SchemaComparisonView/>
+            </TabItem>
             <TabItem Header="对比报表">
                 <views:ComparisonReportView/>
             </TabItem>

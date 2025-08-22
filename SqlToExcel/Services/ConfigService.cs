@@ -192,6 +192,23 @@ namespace SqlToExcel.Services
             return result > 0;
         }
 
+        public async Task SaveAllTableMappingsAsync(IEnumerable<TableMapping> mappings)
+        {
+            try
+            {
+                await _dbService.LocalDb.Ado.UseTranAsync(async () =>
+                {
+                    await _dbService.LocalDb.Deleteable<TableMapping>().ExecuteCommandAsync(); // Delete all
+                    await _dbService.LocalDb.Insertable(mappings.ToList()).ExecuteCommandAsync();
+                });
+                EventService.Publish(new MappingsChangedEvent());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"保存所有表映射时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         public async Task SaveMissingTablesAsync(IEnumerable<string> tableNames)
         {
             var entities = tableNames.Select(name => new MissingTable

@@ -335,7 +335,7 @@ namespace SqlToExcel.Services
             return await CreateExcelPackageBytesAsync(sheets);
         }
 
-        private async Task<byte[]> CreateExcelPackageBytesAsync(IDictionary<string, object> sheets)
+                public async Task<byte[]> CreateExcelPackageBytesAsync(IDictionary<string, object> sheets)
         {
             using (var package = new ExcelPackage())
             {
@@ -446,6 +446,66 @@ namespace SqlToExcel.Services
                     }
                 }
                 return await package.GetAsByteArrayAsync();
+            }
+        }
+
+        public async Task ExportSchemaComparisonAsync(IEnumerable<SchemaComparisonResult> results)
+        {
+            try
+            {
+                var saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "Excel Files|*.xlsx",
+                    Title = "保存主键/索引对比结果",
+                    FileName = $"SchemaComparison_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx"
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    using (var package = new ExcelPackage())
+                    {
+                        var worksheet = package.Workbook.Worksheets.Add("Schema Comparison");
+
+                        // Headers
+                        string[] headers = { "原表名", "原表主键", "原表索引", "新表名", "新表主键", "新表索引" };
+                        for (int i = 0; i < headers.Length; i++)
+                        {
+                            worksheet.Cells[1, i + 1].Value = headers[i];
+                        }
+
+                        // Data
+                        int row = 2;
+                        foreach (var result in results)
+                        {
+                            worksheet.Cells[row, 1].Value = result.SourceTableName;
+                            worksheet.Cells[row, 2].Value = result.SourcePrimaryKeys;
+                            worksheet.Cells[row, 3].Value = result.SourceIndexes;
+                            worksheet.Cells[row, 4].Value = result.TargetTableName;
+                            worksheet.Cells[row, 5].Value = result.TargetPrimaryKeys;
+                            worksheet.Cells[row, 6].Value = result.TargetIndexes;
+                            row++;
+                        }
+
+                        // Styling
+                        var headerRange = worksheet.Cells[1, 1, 1, headers.Length];
+                        headerRange.Style.Font.Bold = true;
+                        headerRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        headerRange.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
+
+                        // Enable text wrapping for multi-line cells
+                        worksheet.Cells[2, 2, row - 1, 3].Style.WrapText = true;
+                        worksheet.Cells[2, 5, row - 1, 6].Style.WrapText = true;
+                        
+                        worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
+
+                        await File.WriteAllBytesAsync(saveFileDialog.FileName, await package.GetAsByteArrayAsync());
+                        MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"导出过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
