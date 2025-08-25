@@ -40,4 +40,12 @@
     </Compile>
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Icon\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="bin\Debug\net9.0-windows\config.db" />
+  </ItemGroup>
+
 </Project>
