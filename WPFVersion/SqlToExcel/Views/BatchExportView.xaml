@@ -14,12 +14,10 @@
         </Grid.RowDefinitions>
 
         <ToolBar Grid.Row="0">
-            <Label Content="搜索:" VerticalAlignment="Center"/>
-            <TextBox Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}" MinWidth="200" Margin="0,0,10,0"
-                     hc:InfoElement.Placeholder="按键搜索" VerticalAlignment="Center" Style="{StaticResource TextBoxExtend}"/>
-            <ToggleButton Content="仅显示无描述" IsChecked="{Binding ShowOnlyMissingDescription, Mode=TwoWay}" VerticalAlignment="Center" Margin="5,0,5,0"/>
+            <hc:SearchBar Style="{StaticResource SearchBarPlus}" Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}" hc:InfoElement.Placeholder="按键或描述搜索" MinWidth="200" Margin="0,0,10,0"/>
+            <ToggleButton Content="仅显示无描述" IsChecked="{Binding ShowOnlyMissingDescription, Mode=TwoWay}" Style="{StaticResource ToggleButtonCustom}" VerticalAlignment="Center" Margin="5,0,5,0"/>
             <Separator/>
-            <Button Content="刷新" Command="{Binding RefreshCommand}" ToolTip="重新加载所有配置"/>
+            <Button Content="刷新" Command="{Binding RefreshCommand}" ToolTip="重新加载所有配置" Style="{StaticResource ButtonInfo}"/>
             <Button Content="导出配置" Command="{Binding ExportConfigsCommand}" ToolTip="将所有配置导出到一个JSON文件"/>
             <Button Content="导入配置" Command="{Binding ImportConfigCommand}" ToolTip="从JSON文件或文本导入配置"/>
             <Separator/>

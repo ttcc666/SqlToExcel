@@ -6,6 +6,7 @@
              xmlns:local="clr-namespace:SqlToExcel.Views"
              xmlns:vm="clr-namespace:SqlToExcel.ViewModels"
              xmlns:converters="clr-namespace:SqlToExcel.Converters"
+             xmlns:hc="https://handyorg.github.io/handycontrol"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <UserControl.DataContext>
@@ -20,13 +21,18 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Button Grid.Row="0" Content="导出" Command="{Binding ExportCommand}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,10,10,5" Padding="10,5" Background="LightSkyBlue" Foreground="White"/>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10,10,10,5">
+            <Button Content="导出" Command="{Binding ExportCommand}" Style="{StaticResource ButtonPrimary}"/>
+            <Button Content="刷新" Command="{Binding RefreshCommand}" Style="{StaticResource ButtonInfo}" Margin="10,0,0,0"/>
+        </StackPanel>
 
-        <DataGrid Grid.Row="1" ItemsSource="{Binding ComparisonResults}" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" Margin="10,0,10,10">
+        <DataGrid Grid.Row="1" ItemsSource="{Binding ComparisonResults}" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" Margin="10,0,10,10"
+                  RowDetailsVisibilityMode="VisibleWhenSelected">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="原表名" Binding="{Binding SourceTableName}" Width="*"/>
+                <DataGridTextColumn Header="源表名" Binding="{Binding SourceTableName}" Width="*"/>
+                <DataGridTextColumn Header="目标表名" Binding="{Binding TargetTableName}" Width="*"/>
 
-                <DataGridTemplateColumn Header="原表主键" Width="*">
+                <DataGridTemplateColumn Header="源表主键" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding SourcePrimaryKeys}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis">
@@ -40,23 +46,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="原表索引" Width="*">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding SourceIndexes}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis">
-                                <TextBlock.ToolTip>
-                                    <ToolTip>
-                                        <TextBlock Text="{Binding SourceIndexes}" />
-                                    </ToolTip>
-                                </TextBlock.ToolTip>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-
-                <DataGridTextColumn Header="新表名" Binding="{Binding TargetTableName}" Width="*"/>
-
-                <DataGridTemplateColumn Header="新表主键" Width="*">
+                <DataGridTemplateColumn Header="目标表主键" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding TargetPrimaryKeys}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis">
@@ -69,22 +59,40 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-
-                <DataGridTemplateColumn Header="新表索引" Width="*">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding TargetIndexes}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis">
-                                <TextBlock.ToolTip>
-                                    <ToolTip>
-                                        <TextBlock Text="{Binding TargetIndexes}" />
-                                    </ToolTip>
-                                </TextBlock.ToolTip>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-
             </DataGrid.Columns>
+
+            <DataGrid.RowDetailsTemplate>
+                <DataTemplate>
+                    <Border Margin="10" Padding="10" BorderBrush="LightGray" BorderThickness="1" CornerRadius="3">
+                        <TabControl>
+                            <TabItem Header="源表索引">
+                                <DataGrid ItemsSource="{Binding SourceIndexes}" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" Margin="5">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="索引字段" Binding="{Binding ColumnsDisplay}"/>
+                                        <DataGridTextColumn Header="索引名称" Binding="{Binding IndexName}"/>
+                                        <DataGridCheckBoxColumn Header="主键" Binding="{Binding IsPrimaryKey}"/>
+                                        <DataGridCheckBoxColumn Header="唯一" Binding="{Binding IsUnique}"/>
+                                        <DataGridCheckBoxColumn Header="聚集" Binding="{Binding IsClustered}"/>
+                                        <DataGridCheckBoxColumn Header="非聚集" Binding="{Binding IsNonClustered}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </TabItem>
+                            <TabItem Header="目标表索引">
+                                <DataGrid ItemsSource="{Binding TargetIndexes}" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" Margin="5">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="索引字段" Binding="{Binding ColumnsDisplay}"/>
+                                        <DataGridTextColumn Header="索引名称" Binding="{Binding IndexName}"/>
+                                        <DataGridCheckBoxColumn Header="主键" Binding="{Binding IsPrimaryKey}"/>
+                                        <DataGridCheckBoxColumn Header="唯一" Binding="{Binding IsUnique}"/>
+                                        <DataGridCheckBoxColumn Header="聚集" Binding="{Binding IsClustered}"/>
+                                        <DataGridCheckBoxColumn Header="非聚集" Binding="{Binding IsNonClustered}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </TabItem>
+                        </TabControl>
+                    </Border>
+                </DataTemplate>
+            </DataGrid.RowDetailsTemplate>
         </DataGrid>
 
         <ProgressBar Grid.RowSpan="2" IsIndeterminate="True" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" 

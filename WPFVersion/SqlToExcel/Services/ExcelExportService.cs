@@ -206,20 +206,10 @@ namespace SqlToExcel.Services
                         var worksheet = package.Workbook.Worksheets.Add("Validation Report");
                         int rowIdx = 1;
 
-                        // Overall Summary (optional, but good to have)
-                        // worksheet.Cells[rowIdx, 1].Value = "Validation Summary:";
-                        // worksheet.Cells[rowIdx, 1].Style.Font.Bold = true;
-                        // rowIdx++;
-                        // worksheet.Cells[rowIdx, 1].Value = "Total Rows Compared: ...";
-                        // rowIdx++;
-                        // ...
-
                         foreach (var rowResult in validationResults)
                         {
-                            // Add a blank row for spacing between groups
                             if (rowIdx > 1) rowIdx++; 
 
-                            // Group Header: Row Name and Summary
                             worksheet.Cells[rowIdx, 1].Value = rowResult.GroupName;
                             worksheet.Cells[rowIdx, 1].Style.Font.Bold = true;
                             worksheet.Cells[rowIdx, 1].Style.Font.Size = 12;
@@ -228,7 +218,6 @@ namespace SqlToExcel.Services
                             worksheet.Cells[rowIdx, 2].Style.Font.Size = 10;
                             rowIdx++;
 
-                            // Mismatch Details Header
                             worksheet.Cells[rowIdx, 1].Value = "字段名";
                             worksheet.Cells[rowIdx, 2].Value = "源数据";
                             worksheet.Cells[rowIdx, 3].Value = "目标数据";
@@ -238,7 +227,6 @@ namespace SqlToExcel.Services
                             headerRange.Style.Fill.BackgroundColor.SetColor(Color.LightGray);
                             rowIdx++;
 
-                            // Mismatch Details
                             foreach (var mismatch in rowResult.Mismatches)
                             {
                                 worksheet.Cells[rowIdx, 1].Value = mismatch.DisplayColumnName;
@@ -255,7 +243,6 @@ namespace SqlToExcel.Services
                             }
                         }
 
-                        // Auto-fit columns and set default row height
                         worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
                         worksheet.DefaultRowHeight = 20;
 
@@ -335,7 +322,7 @@ namespace SqlToExcel.Services
             return await CreateExcelPackageBytesAsync(sheets);
         }
 
-                public async Task<byte[]> CreateExcelPackageBytesAsync(IDictionary<string, object> sheets)
+        public async Task<byte[]> CreateExcelPackageBytesAsync(IDictionary<string, object> sheets)
         {
             using (var package = new ExcelPackage())
             {
@@ -464,39 +451,114 @@ namespace SqlToExcel.Services
                 {
                     using (var package = new ExcelPackage())
                     {
-                        var worksheet = package.Workbook.Worksheets.Add("Schema Comparison");
-
-                        // Headers
-                        string[] headers = { "原表名", "原表主键", "原表索引", "新表名", "新表主键", "新表索引" };
-                        for (int i = 0; i < headers.Length; i++)
+                        // Sheet 1: Table Comparison Summary
+                        var summarySheet = package.Workbook.Worksheets.Add("表结构对比");
+                        string[] summaryHeaders = { "源表名", "源表主键", "目标表名", "目标表主键" };
+                        for (int i = 0; i < summaryHeaders.Length; i++)
                         {
-                            worksheet.Cells[1, i + 1].Value = headers[i];
+                            summarySheet.Cells[1, i + 1].Value = summaryHeaders[i];
                         }
-
-                        // Data
-                        int row = 2;
+                        int summaryRow = 2;
                         foreach (var result in results)
                         {
-                            worksheet.Cells[row, 1].Value = result.SourceTableName;
-                            worksheet.Cells[row, 2].Value = result.SourcePrimaryKeys;
-                            worksheet.Cells[row, 3].Value = result.SourceIndexes;
-                            worksheet.Cells[row, 4].Value = result.TargetTableName;
-                            worksheet.Cells[row, 5].Value = result.TargetPrimaryKeys;
-                            worksheet.Cells[row, 6].Value = result.TargetIndexes;
-                            row++;
+                            summarySheet.Cells[summaryRow, 1].Value = result.SourceTableName;
+                            summarySheet.Cells[summaryRow, 2].Value = result.SourcePrimaryKeys;
+                            summarySheet.Cells[summaryRow, 3].Value = result.TargetTableName;
+                            summarySheet.Cells[summaryRow, 4].Value = result.TargetPrimaryKeys;
+                            summarySheet.Cells[summaryRow, 2].Style.WrapText = true;
+                            summarySheet.Cells[summaryRow, 4].Style.WrapText = true;
+                            summaryRow++;
                         }
+                        var summaryHeaderRange = summarySheet.Cells[1, 1, 1, summarySheet.Dimension.End.Column];
+                        summaryHeaderRange.Style.Font.Bold = true;
+                        summaryHeaderRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        summaryHeaderRange.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.DodgerBlue);
+                        summaryHeaderRange.Style.Font.Color.SetColor(System.Drawing.Color.White);
+                        ApplySmartColumnWidth(summarySheet, summarySheet.Dimension);
 
-                        // Styling
-                        var headerRange = worksheet.Cells[1, 1, 1, headers.Length];
-                        headerRange.Style.Font.Bold = true;
-                        headerRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                        headerRange.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
+                        // Sheet 2: Index Details (Side-by-Side)
+                        var indexSheet = package.Workbook.Worksheets.Add("索引详细信息");
+                        string[] indexHeaders = { "索引名称", "索引字段", "主键", "唯一", "聚集", "非聚集" };
+                        int currentRow = 1;
+                        const int rightBlockStartCol = 8; // Start target table info in column H, leaving a gap
 
-                        // Enable text wrapping for multi-line cells
-                        worksheet.Cells[2, 2, row - 1, 3].Style.WrapText = true;
-                        worksheet.Cells[2, 5, row - 1, 6].Style.WrapText = true;
+                        foreach (var result in results)
+                        {
+                            if (currentRow > 1) { currentRow += 2; } // Add space before the new comparison block
+                            int blockStartRow = currentRow;
+
+                            var sourceHeaderCell = indexSheet.Cells[currentRow, 1];
+                            sourceHeaderCell.Value = $"源表: {result.SourceTableName}";
+                            sourceHeaderCell.Style.Font.Bold = true;
+                            indexSheet.Cells[currentRow, 1, currentRow, indexHeaders.Length].Merge = true;
+
+                            var targetHeaderCell = indexSheet.Cells[currentRow, rightBlockStartCol];
+                            targetHeaderCell.Value = $"目标表: {result.TargetTableName}";
+                            targetHeaderCell.Style.Font.Bold = true;
+                            indexSheet.Cells[currentRow, rightBlockStartCol, currentRow, rightBlockStartCol + indexHeaders.Length - 1].Merge = true;
+                            currentRow++;
+
+                            for (int i = 0; i < indexHeaders.Length; i++)
+                            {
+                                indexSheet.Cells[currentRow, 1 + i].Value = indexHeaders[i];
+                                indexSheet.Cells[currentRow, rightBlockStartCol + i].Value = indexHeaders[i];
+                            }
+
+                            var leftHeaderRange = indexSheet.Cells[currentRow, 1, currentRow, indexHeaders.Length];
+                            leftHeaderRange.Style.Font.Bold = true;
+                            leftHeaderRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                            leftHeaderRange.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightSteelBlue);
+
+                            var rightHeaderRange = indexSheet.Cells[currentRow, rightBlockStartCol, currentRow, rightBlockStartCol + indexHeaders.Length - 1];
+                            rightHeaderRange.Style.Font.Bold = true;
+                            rightHeaderRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                            rightHeaderRange.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightSteelBlue);
+                            currentRow++;
+
+                            int sourceIndexCount = result.SourceIndexes?.Count ?? 0;
+                            int targetIndexCount = result.TargetIndexes?.Count ?? 0;
+                            int maxRows = Math.Max(sourceIndexCount, targetIndexCount);
+
+                            for (int i = 0; i < maxRows; i++)
+                            {
+                                if (i < sourceIndexCount)
+                                {
+                                    var index = result.SourceIndexes[i];
+                                    indexSheet.Cells[currentRow + i, 1].Value = index.IndexName;
+                                    indexSheet.Cells[currentRow + i, 2].Value = index.ColumnsDisplay;
+                                    indexSheet.Cells[currentRow + i, 3].Value = index.IsPrimaryKey ? "是" : "否";
+                                    indexSheet.Cells[currentRow + i, 4].Value = index.IsUnique ? "是" : "否";
+                                    indexSheet.Cells[currentRow + i, 5].Value = index.IsClustered ? "是" : "否";
+                                    indexSheet.Cells[currentRow + i, 6].Value = index.IsNonClustered ? "是" : "否";
+                                }
+                                if (i < targetIndexCount)
+                                {
+                                    var index = result.TargetIndexes[i];
+                                    indexSheet.Cells[currentRow + i, rightBlockStartCol].Value = index.IndexName;
+                                    indexSheet.Cells[currentRow + i, rightBlockStartCol + 1].Value = index.ColumnsDisplay;
+                                    indexSheet.Cells[currentRow + i, rightBlockStartCol + 2].Value = index.IsPrimaryKey ? "是" : "否";
+                                    indexSheet.Cells[currentRow + i, rightBlockStartCol + 3].Value = index.IsUnique ? "是" : "否";
+                                    indexSheet.Cells[currentRow + i, rightBlockStartCol + 4].Value = index.IsClustered ? "是" : "否";
+                                    indexSheet.Cells[currentRow + i, rightBlockStartCol + 5].Value = index.IsNonClustered ? "是" : "否";
+                                }
+                            }
+
+                            int blockEndRow = currentRow + maxRows - 1;
+                            if (maxRows == 0) { blockEndRow = currentRow - 1; }
+                            var blockRange = indexSheet.Cells[blockStartRow, 1, blockEndRow, rightBlockStartCol + indexHeaders.Length - 1];
+                            blockRange.Style.Border.Top.Style = ExcelBorderStyle.Thin;
+                            blockRange.Style.Border.Left.Style = ExcelBorderStyle.Thin;
+                            blockRange.Style.Border.Right.Style = ExcelBorderStyle.Thin;
+                            blockRange.Style.Border.Bottom.Style = ExcelBorderStyle.Thin;
+
+                            currentRow += maxRows;
+                        }
                         
-                        worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
+                        // Custom autofit for the complex index sheet
+                        if (indexSheet.Dimension != null) 
+                        {
+                            ApplySmartColumnWidth(indexSheet, indexSheet.Dimension, false);
+                        }
 
                         await File.WriteAllBytesAsync(saveFileDialog.FileName, await package.GetAsByteArrayAsync());
                         MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -506,6 +568,41 @@ namespace SqlToExcel.Services
             catch (Exception ex)
             {
                 MessageBox.Show($"导出过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ApplySmartColumnWidth(ExcelWorksheet worksheet, ExcelAddressBase dataRange, bool checkAllRows = true)
+        {
+            if (dataRange == null) return;
+
+            var columnWidths = new Dictionary<int, double>();
+
+            for (int i = 1; i <= dataRange.End.Column; i++)
+            {
+                columnWidths[i] = 0;
+            }
+
+            // Iterate through all rows to find the max width for each column
+            int maxRows = checkAllRows ? dataRange.End.Row : Math.Min(100, dataRange.End.Row);
+            for (int row = 1; row <= maxRows; row++)
+            {
+                for (int col = 1; col <= dataRange.End.Column; col++)
+                {
+                    var cellText = worksheet.Cells[row, col].Text;
+                    if (!string.IsNullOrEmpty(cellText))
+                    {
+                        double width = CalculateColumnWidth(cellText);
+                        if (width > columnWidths[col])
+                        {
+                            columnWidths[col] = width;
+                        }
+                    }
+                }
+            }
+
+            for (int i = 1; i <= dataRange.End.Column; i++)
+            {
+                worksheet.Column(i).Width = Math.Min(Math.Max(columnWidths[i] * 1.2, 10), 60);
             }
         }
     }

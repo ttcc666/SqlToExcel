@@ -1,5 +1,6 @@
 using SqlToExcel.Models;
 using SqlToExcel.Services;
+using SqlToExcel.ViewModels;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -7,6 +8,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using System;
 
 namespace SqlToExcel.ViewModels
 {
@@ -20,6 +22,7 @@ namespace SqlToExcel.ViewModels
         public ObservableCollection<SchemaComparisonResult> ComparisonResults { get; } = new ObservableCollection<SchemaComparisonResult>();
 
         public ICommand ExportCommand { get; }
+        public ICommand RefreshCommand { get; }
 
         public bool IsLoading
         {
@@ -33,7 +36,8 @@ namespace SqlToExcel.ViewModels
             _databaseService = DatabaseService.Instance;
             _excelExportService = new ExcelExportService();
 
-            ExportCommand = new RelayCommand(async _ => await ExportAsync(), _ => ComparisonResults.Any());
+            ExportCommand = new RelayCommand(async _ => await ExportAsync(), _ => ComparisonResults != null && ComparisonResults.Any());
+            RefreshCommand = new RelayCommand(async _ => await LoadComparisonDataAsync());
 
             EventService.Subscribe<MappingsChangedEvent>(async e => await LoadComparisonDataAsync());
             _ = LoadComparisonDataAsync();
@@ -41,7 +45,7 @@ namespace SqlToExcel.ViewModels
 
         private async Task ExportAsync()
         {
-            if (!ComparisonResults.Any())
+            if (ComparisonResults == null || !ComparisonResults.Any())
             {
                 System.Windows.MessageBox.Show("没有可导出的数据。", "提示", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
                 return;
@@ -58,22 +62,55 @@ namespace SqlToExcel.ViewModels
             try
             {
                 var mappings = await _configService.GetTableMappingsAsync();
-                foreach (var mapping in mappings)
+                if (mappings == null) { return; }
+                var validMappings = mappings.Where(m => m != null).ToList();
+
+                // Use OrdinalIgnoreCase for case-insensitive comparison of table names
+                var mappedTargetTables = new HashSet<string>(
+                    validMappings.Select(m => m.TargetTable),
+                    StringComparer.OrdinalIgnoreCase
+                );
+
+                // 1. Process mapped tables
+                foreach (var mapping in validMappings)
                 {
                     var sourcePks = await _databaseService.GetPrimaryKeysAsync("source", mapping.SourceTable);
-                    var sourceIndexDetails = await _databaseService.GetIndexDetailsAsync("source", mapping.SourceTable);
-                    
+                    var sourceIndexDetailsRaw = await _databaseService.GetIndexDetailsAsync("source", mapping.SourceTable);
+
                     var targetPks = await _databaseService.GetPrimaryKeysAsync("target", mapping.TargetTable);
-                    var targetIndexDetails = await _databaseService.GetIndexDetailsAsync("target", mapping.TargetTable);
+                    var targetIndexDetailsRaw = await _databaseService.GetIndexDetailsAsync("target", mapping.TargetTable);
 
                     var result = new SchemaComparisonResult
                     {
                         SourceTableName = mapping.SourceTable,
                         SourcePrimaryKeys = string.Join("\n", sourcePks),
-                        SourceIndexes = FormatIndexDetails(sourceIndexDetails, sourcePks),
+                        SourceIndexes = ProcessIndexDetails(sourceIndexDetailsRaw),
                         TargetTableName = mapping.TargetTable,
                         TargetPrimaryKeys = string.Join("\n", targetPks),
-                        TargetIndexes = FormatIndexDetails(targetIndexDetails, targetPks)
+                        TargetIndexes = ProcessIndexDetails(targetIndexDetailsRaw)
+                    };
+                    ComparisonResults.Add(result);
+                }
+
+                // 2. Process unmapped tables
+                var allTargetTables = await _databaseService.GetTablesAsync("target");
+                if (allTargetTables == null) { return; } // Nothing to compare against
+
+                var unmappedTables = allTargetTables.Where(t => !mappedTargetTables.Contains(t));
+
+                foreach (var tableName in unmappedTables)
+                {
+                    var targetPks = await _databaseService.GetPrimaryKeysAsync("target", tableName);
+                    var targetIndexDetailsRaw = await _databaseService.GetIndexDetailsAsync("target", tableName);
+
+                    var result = new SchemaComparisonResult
+                    {
+                        SourceTableName = "(无对应源表)",
+                        SourcePrimaryKeys = string.Empty,
+                        SourceIndexes = new List<IndexDetailViewModel>(),
+                        TargetTableName = tableName,
+                        TargetPrimaryKeys = string.Join("\n", targetPks),
+                        TargetIndexes = ProcessIndexDetails(targetIndexDetailsRaw)
                     };
                     ComparisonResults.Add(result);
                 }
@@ -84,30 +121,34 @@ namespace SqlToExcel.ViewModels
             }
         }
 
-        private string FormatIndexDetails(List<IndexDetail> indexDetails, List<string> primaryKeys)
+        private List<IndexDetailViewModel> ProcessIndexDetails(List<IndexDetail> rawDetails)
         {
-            if (indexDetails == null || !indexDetails.Any())
+            if (rawDetails == null || !rawDetails.Any())
             {
-                return string.Empty;
+                return new List<IndexDetailViewModel>();
             }
 
-            var formattedIndexes = indexDetails
-                .GroupBy(i => i.IndexName)
-                .Where(g => !primaryKeys.Contains(g.Key)) // Exclude primary key indexes
-                .Select(g =>
+            var groupedIndexes = rawDetails.GroupBy(i => i.IndexName);
+            var processedList = new List<IndexDetailViewModel>();
+
+            foreach (var group in groupedIndexes)
+            {
+                var first = group.First();
+                var columns = group.Select(i => i.ColumnName).Where(c => !string.IsNullOrEmpty(c)).Distinct();
+
+                var newDetail = new IndexDetailViewModel
                 {
-                    var indexName = g.Key;
-                    var indexType = g.First().IndexType.Replace("_", " ");
-                    var columns = g.Where(i => !i.IsIncludedColumn).Select(i => i.ColumnName);
-                    var includedColumns = g.Where(i => i.IsIncludedColumn).Select(i => i.ColumnName);
+                    IndexName = group.Key,
+                    IsPrimaryKey = first.IsPrimaryKey,
+                    IsUnique = first.IsUnique,
+                    IsClustered = first.IsClustered,
+                    IsNonClustered = first.IsNonClustered,
+                    ColumnsDisplay = string.Join(", ", columns)
+                };
+                processedList.Add(newDetail);
+            }
 
-                    var columnString = string.Join(", ", columns);
-                    var includedString = includedColumns.Any() ? $" INCLUDE ({string.Join(", ", includedColumns)})" : "";
-
-                    return $"{indexName} ({indexType}): [{columnString}]{includedString}";
-                });
-
-            return string.Join("\n", formattedIndexes);
+            return processedList;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

@@ -1,3 +1,5 @@
+using SqlToExcel.ViewModels;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -19,8 +21,8 @@ namespace SqlToExcel.Models
             set { _sourcePrimaryKeys = value; OnPropertyChanged(); }
         }
 
-        private string _sourceIndexes;
-        public string SourceIndexes
+        private List<IndexDetailViewModel> _sourceIndexes;
+        public List<IndexDetailViewModel> SourceIndexes
         {
             get => _sourceIndexes;
             set { _sourceIndexes = value; OnPropertyChanged(); }
@@ -40,8 +42,8 @@ namespace SqlToExcel.Models
             set { _targetPrimaryKeys = value; OnPropertyChanged(); }
         }
 
-        private string _targetIndexes;
-        public string TargetIndexes
+        private List<IndexDetailViewModel> _targetIndexes;
+        public List<IndexDetailViewModel> TargetIndexes
         {
             get => _targetIndexes;
             set { _targetIndexes = value; OnPropertyChanged(); }

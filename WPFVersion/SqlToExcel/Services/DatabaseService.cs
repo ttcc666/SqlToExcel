@@ -106,6 +106,14 @@ namespace SqlToExcel.Services
             return db?.DbMaintenance.GetTableInfoList(false).OrderBy(t => t.Name).ToList() ?? new List<DbTableInfo>();
         }
 
+        public async System.Threading.Tasks.Task<List<string>> GetTablesAsync(string dbKey)
+        {
+            var db = GetDbConnection(dbKey);
+            if (db == null) return new List<string>();
+            var tables = await System.Threading.Tasks.Task.Run(() => db.DbMaintenance.GetTableInfoList(false));
+            return tables?.Select(t => t.Name).ToList() ?? new List<string>();
+        }
+
         public List<DbColumnInfo> GetColumns(string dbKey, string tableName)
         {
             var db = GetDbConnection(dbKey);
@@ -296,7 +304,11 @@ namespace SqlToExcel.Services
                 i.name AS IndexName,
                 c.name AS ColumnName,
                 i.type_desc AS IndexType,
-                ic.is_included_column AS IsIncludedColumn
+                ic.is_included_column AS IsIncludedColumn,
+                i.is_primary_key AS IsPrimaryKey,
+                i.is_unique AS IsUnique,
+                CASE WHEN i.type = 1 THEN 1 ELSE 0 END AS IsClustered,
+                CASE WHEN i.type = 2 THEN 1 ELSE 0 END AS IsNonClustered
             FROM 
                 sys.indexes AS i
             INNER JOIN 

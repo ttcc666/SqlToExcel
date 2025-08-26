@@ -1,16 +1,12 @@
-namespace SqlToExcel.Models
+namespace SqlToExcel.ViewModels
 {
-    public class IndexDetail
+    public class IndexDetailViewModel
     {
         public string IndexName { get; set; }
-        public string ColumnName { get; set; }
-        public string IndexType { get; set; }
-        public bool IsIncludedColumn { get; set; }
+        public string ColumnsDisplay { get; set; }
         public bool IsPrimaryKey { get; set; }
         public bool IsUnique { get; set; }
-        // 聚集
         public bool IsClustered { get; set; }
-        // 非聚集
         public bool IsNonClustered { get; set; }
     }
 }
