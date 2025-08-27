@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using SqlToExcel.Models;
 using SqlToExcel.Services;
 using System;
@@ -83,7 +84,7 @@ namespace SqlToExcel.ViewModels
                 try
                 {
                     var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                    requests = JsonSerializer.Deserialize<List<FieldTypeRequest>>(normalizedJson, options);
+                    requests = JsonSerializer.Deserialize<List<FieldTypeRequest>>(normalizedJson, options) ?? throw new Exception("JSON反序列化失败");
                     if (requests == null || requests.Count == 0)
                     {
                         throw new Exception("JSON数组为空或无法解析。");
@@ -196,7 +197,7 @@ namespace SqlToExcel.ViewModels
         {
             try
             {
-                var excelService = new ExcelExportService();
+                var excelService = App.ServiceProvider.GetRequiredService<ExcelExportService>();
                 excelService.ExportComparisonResults(TabResults);
             }
             catch (Exception ex)
@@ -206,8 +207,8 @@ namespace SqlToExcel.ViewModels
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

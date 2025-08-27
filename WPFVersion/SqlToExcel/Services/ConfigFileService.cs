@@ -1,4 +1,5 @@
 using SqlToExcel.Models;
+using SqlToExcel.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,37 +7,21 @@ using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
-using System.Windows;
+using System.Threading.Tasks;
 
 namespace SqlToExcel.Services
 {
     public class ConfigFileService
     {
+        private readonly IMessageService _messageService;
         private const string ConfigFileName = "batch_export_configs.json";
-        private static ConfigFileService? _instance;
-        private static readonly object _lock = new object();
 
-        public static ConfigFileService Instance
+        public ConfigFileService(IMessageService messageService)
         {
-            get
-            {
-                if (_instance == null)
-                {
-                    lock (_lock)
-                    {
-                        if (_instance == null)
-                        {
-                            _instance = new ConfigFileService();
-                        }
-                    }
-                }
-                return _instance;
-            }
+            _messageService = messageService;
         }
 
-        private ConfigFileService() { }
-
-        public List<BatchExportConfig> LoadConfigs()
+        public async Task<List<BatchExportConfig>> LoadConfigsAsync()
         {
             try
             {
@@ -45,7 +30,7 @@ namespace SqlToExcel.Services
                     return new List<BatchExportConfig>();
                 }
 
-                var json = File.ReadAllText(ConfigFileName);
+                var json = await File.ReadAllTextAsync(ConfigFileName);
                 var options = new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
@@ -55,78 +40,91 @@ namespace SqlToExcel.Services
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"加载配置文件时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"加载配置文件时出错: {ex.Message}");
                 return new List<BatchExportConfig>();
+            }
+        }
+
+        public List<BatchExportConfig> LoadConfigs()
+        {
+            return LoadConfigsAsync().Result;
+        }
+
+        public async Task<bool> SaveConfigAsync(BatchExportConfig newConfig, bool overwrite = false)
+        {
+            try
+            {
+                var configs = await LoadConfigsAsync();
+
+                // 检查键是否已存在
+                var existingConfig = configs.FirstOrDefault(c =>
+                    string.Equals(c.Key, newConfig.Key, StringComparison.OrdinalIgnoreCase));
+
+                if (existingConfig != null)
+                {
+                    if (!overwrite)
+                    {
+                        var shouldOverwrite = await _messageService.ShowConfirmationAsync(
+                            $"配置键 '{newConfig.Key}' 已存在。是否要覆盖现有配置？",
+                            "配置已存在");
+
+                        if (!shouldOverwrite)
+                        {
+                            return false;
+                        }
+                    }
+
+                    // 移除旧配置
+                    configs.Remove(existingConfig);
+                }
+
+                // 添加新配置
+                configs.Add(newConfig);
+
+                // 保存到文件
+                await SaveToFileAsync(configs);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                await _messageService.ShowErrorAsync($"保存配置时出错: {ex.Message}");
+                return false;
             }
         }
 
         public bool SaveConfig(BatchExportConfig newConfig, bool overwrite = false)
         {
+            return SaveConfigAsync(newConfig, overwrite).Result;
+        }
+
+        public async Task<bool> DeleteConfigAsync(string key)
+        {
             try
             {
-                var configs = LoadConfigs();
-                
-                // 检查键是否已存在
-                var existingConfig = configs.FirstOrDefault(c => 
-                    string.Equals(c.Key, newConfig.Key, StringComparison.OrdinalIgnoreCase));
-                
-                if (existingConfig != null)
+                var configs = await LoadConfigsAsync();
+                var configToRemove = configs.FirstOrDefault(c =>
+                    string.Equals(c.Key, key, StringComparison.OrdinalIgnoreCase));
+
+                if (configToRemove != null)
                 {
-                    if (!overwrite)
-                    {
-                        var result = MessageBox.Show(
-                            $"配置键 '{newConfig.Key}' 已存在。是否要覆盖现有配置？",
-                            "配置已存在",
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Question);
-                        
-                        if (result != MessageBoxResult.Yes)
-                        {
-                            return false;
-                        }
-                    }
-                    
-                    // 移除旧配置
-                    configs.Remove(existingConfig);
+                    configs.Remove(configToRemove);
+                    await SaveToFileAsync(configs);
+                    OnConfigsChanged(); // 触发事件
+                    return true;
                 }
-                
-                // 添加新配置
-                configs.Add(newConfig);
-                
-                // 保存到文件
-                SaveToFile(configs);
-                return true;
+
+                return false;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"保存配置时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"删除配置时出错: {ex.Message}");
                 return false;
             }
         }
 
         public bool DeleteConfig(string key)
         {
-            try
-            {
-                var configs = LoadConfigs();
-                var configToRemove = configs.FirstOrDefault(c => 
-                    string.Equals(c.Key, key, StringComparison.OrdinalIgnoreCase));
-                
-                if (configToRemove != null)
-                {
-                    configs.Remove(configToRemove);
-                    SaveToFile(configs);
-                    OnConfigsChanged(); // 触发事件
-                    return true;
-                }
-                
-                return false;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"删除配置时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                return false;
-            }
+            return DeleteConfigAsync(key).Result;
         }
 
         public bool IsKeyExists(string key)
@@ -135,7 +133,7 @@ namespace SqlToExcel.Services
             return configs.Any(c => string.Equals(c.Key, key, StringComparison.OrdinalIgnoreCase));
         }
 
-        private void SaveToFile(List<BatchExportConfig> configs)
+        private async Task SaveToFileAsync(List<BatchExportConfig> configs)
         {
             var options = new JsonSerializerOptions
             {
@@ -143,9 +141,14 @@ namespace SqlToExcel.Services
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
-            
+
             var json = JsonSerializer.Serialize(configs, options);
-            File.WriteAllText(ConfigFileName, json);
+            await File.WriteAllTextAsync(ConfigFileName, json);
+        }
+
+        private void SaveToFile(List<BatchExportConfig> configs)
+        {
+            SaveToFileAsync(configs).Wait();
         }
 
         public event EventHandler? ConfigsChanged;
@@ -160,11 +163,11 @@ namespace SqlToExcel.Services
             OnConfigsChanged();
         }
 
-        public IEnumerable<TableMapping> ImportTableMappings(string filePath)
+        public async Task<IEnumerable<TableMapping>> ImportTableMappingsAsync(string filePath)
         {
             try
             {
-                var json = File.ReadAllText(filePath);
+                var json = await File.ReadAllTextAsync(filePath);
                 var options = new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
@@ -185,9 +188,14 @@ namespace SqlToExcel.Services
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"导入映射配置时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"导入映射配置时出错: {ex.Message}");
                 return Enumerable.Empty<TableMapping>();
             }
+        }
+
+        public IEnumerable<TableMapping> ImportTableMappings(string filePath)
+        {
+            return ImportTableMappingsAsync(filePath).Result;
         }
     }
 }

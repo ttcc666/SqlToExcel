@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using SqlToExcel.Models;
 using SqlToExcel.Services;
 using System;
@@ -13,13 +14,13 @@ namespace SqlToExcel.ViewModels
 {
     public class ComparisonReportViewModel : INotifyPropertyChanged
     {
-        private ComparisonReport _selectedReport;
+        private ComparisonReport? _selectedReport;
         private bool _isLoading = false;
 
         public ObservableCollection<ComparisonReport> Reports { get; set; }
         public ObservableCollection<ComparisonResultItem> DetailedResults { get; set; }
 
-        public ComparisonReport SelectedReport
+        public ComparisonReport? SelectedReport
         {
             get => _selectedReport;
             set
@@ -48,8 +49,8 @@ namespace SqlToExcel.ViewModels
             ExportCommand = new RelayCommand(p => ExportAllReports(), p => Reports.Any());
             DeleteSelectedCommand = new RelayCommand(p => DeleteSelected(p), p => p is System.Collections.IList list && list.Count > 0);
 
-            EventService.Subscribe<ComparisonReportUpdatedEvent>(e => LoadReportsAsync());
-            LoadReportsAsync();
+            EventService.Subscribe<ComparisonReportUpdatedEvent>(e => _ = LoadReportsAsync());
+            _ = LoadReportsAsync();
         }
 
         private async Task LoadReportsAsync()
@@ -115,11 +116,11 @@ namespace SqlToExcel.ViewModels
                 });
             }
 
-            var excelService = new ExcelExportService();
+            var excelService = App.ServiceProvider.GetRequiredService<ExcelExportService>();
             excelService.ExportComparisonResults(allTabs);
         }
 
-        private async void DeleteSelected(object selectedItems)
+        private async void DeleteSelected(object? selectedItems)
         {
             if (selectedItems is not System.Collections.IList items || items.Count == 0) return;
 
@@ -150,8 +151,8 @@ namespace SqlToExcel.ViewModels
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

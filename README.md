@@ -18,7 +18,8 @@ A .NET WPF application designed to connect to two separate SQL databases, execut
 - **Architecture**: Model-View-ViewModel (MVVM)
 - **UI Library**: [HandyControl](https://github.com/handyorg/handycontrol)
 - **ORM**: [SqlSugarCore](https://github.com/sqlSugar/SqlSugar)
-- **Excel Export**: [MiniExcel](https://github.com/mini-software/MiniExcel)
+- **Excel Export**: [EPPlus](https://github.com/EPPlusSoftware/EPPlus)
+- **Dependency Injection**: [Microsoft.Extensions.DependencyInjection](https://docs.microsoft.com/en-us/dotnet/core/extensions/dependency-injection)
 
 ## Getting Started
 

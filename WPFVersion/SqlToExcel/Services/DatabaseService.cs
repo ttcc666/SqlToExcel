@@ -86,7 +86,7 @@ namespace SqlToExcel.Services
                 {
                     Db.GetConnection("source").Ado.IsValidConnection();
                     Db.GetConnection("target").Ado.IsValidConnection();
-                    if (connectionConfigs.Any(c => c.ConfigId == "framework"))
+                    if (connectionConfigs.Any(c => string.Equals(c.ConfigId?.ToString(), "framework", StringComparison.Ordinal)))
                     {
                         Db.GetConnection("framework").Ado.IsValidConnection();
                     }

@@ -8,9 +8,9 @@ namespace SqlToExcel.Models
         public string SourceValue { get; set; }
         public string TargetValue { get; set; }
         public bool IsMatch { get; set; }
-        public string GroupName { get; set; } // To group by row, for example
+        public string? GroupName { get; set; } // To group by row, for example
 
-        public ValidationResultItem(string sourceColumnName, string targetColumnName, string sourceValue, string targetValue, string groupName = null)
+        public ValidationResultItem(string sourceColumnName, string targetColumnName, string sourceValue, string targetValue, string? groupName = null)
         {
             SourceColumnName = sourceColumnName;
             TargetColumnName = targetColumnName;

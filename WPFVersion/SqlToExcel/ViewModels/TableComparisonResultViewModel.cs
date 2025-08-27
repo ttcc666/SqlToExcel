@@ -7,8 +7,8 @@ namespace SqlToExcel.ViewModels
 {
     public class TableComparisonResultViewModel : INotifyPropertyChanged
     {
-        private string _tableName;
-        private string _statusMessage;
+        private string _tableName = string.Empty;
+        private string _statusMessage = string.Empty;
         public ObservableCollection<ComparisonResultItem> ComparisonResults { get; set; }
 
         public string TableName
@@ -28,8 +28,8 @@ namespace SqlToExcel.ViewModels
             ComparisonResults = new ObservableCollection<ComparisonResultItem>();
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -129,7 +130,8 @@ namespace SqlToExcel.ViewModels
             }
 
             // 异步检查键是否存在
-            if (!IsEditMode && await Services.ConfigService.Instance.IsKeyExistsAsync(ConfigKey))
+            var configService = App.ServiceProvider.GetRequiredService<Services.ConfigService>();
+            if (!IsEditMode && await configService.IsKeyExistsAsync(ConfigKey))
             {
                  var result = MessageBox.Show(
                             $"配置键 '{ConfigKey}' 已存在。是否要覆盖现有配置？",

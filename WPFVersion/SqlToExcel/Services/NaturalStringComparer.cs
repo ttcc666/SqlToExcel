@@ -14,8 +14,11 @@ namespace SqlToExcel.Services
 
     public sealed class NaturalStringComparer : IComparer<string>
     {
-        public int Compare(string a, string b)
+        public int Compare(string? a, string? b)
         {
+            if (a == null && b == null) return 0;
+            if (a == null) return -1;
+            if (b == null) return 1;
             return SafeNativeMethods.StrCmpLogicalW(a, b);
         }
     }

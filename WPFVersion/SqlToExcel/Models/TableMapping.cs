@@ -6,7 +6,7 @@ namespace SqlToExcel.Models
     {
         [SugarColumn(IsPrimaryKey = true, IsIdentity = true)]
         public int Id { get; set; }
-        public string SourceTable { get; set; }
-        public string TargetTable { get; set; }
+        public string SourceTable { get; set; } = string.Empty;
+        public string TargetTable { get; set; } = string.Empty;
     }
 }

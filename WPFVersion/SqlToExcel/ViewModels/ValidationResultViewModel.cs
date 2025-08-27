@@ -12,11 +12,11 @@ namespace SqlToExcel.ViewModels
 {
     public class ValidationRowResultViewModel
     {
-        public string GroupName { get; }
+        public string? GroupName { get; }
         public string MismatchedColumnsSummary { get; }
         public ObservableCollection<ValidationResultItem> Mismatches { get; }
 
-        public ValidationRowResultViewModel(string groupName, IEnumerable<ValidationResultItem> mismatches)
+        public ValidationRowResultViewModel(string? groupName, IEnumerable<ValidationResultItem> mismatches)
         {
             GroupName = groupName;
             Mismatches = new ObservableCollection<ValidationResultItem>(mismatches);
@@ -132,8 +132,8 @@ namespace SqlToExcel.ViewModels
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

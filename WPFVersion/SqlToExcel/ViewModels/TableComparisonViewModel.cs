@@ -11,11 +11,11 @@ namespace SqlToExcel.ViewModels
 {
     public class TableComparisonViewModel : INotifyPropertyChanged
     {
-        private string _jsonSourceTables;
+        private string _jsonSourceTables = string.Empty;
         private readonly DatabaseService _databaseService;
         private readonly ConfigService _configService;
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         public string JsonSourceTables
         {
@@ -31,10 +31,10 @@ namespace SqlToExcel.ViewModels
 
         public RelayCommand CompareCommand { get; }
 
-        public TableComparisonViewModel()
+        public TableComparisonViewModel(DatabaseService databaseService, ConfigService configService)
         {
-            _databaseService = DatabaseService.Instance;
-            _configService = ConfigService.Instance;
+            _databaseService = databaseService;
+            _configService = configService;
             CompareCommand = new RelayCommand(async _ => await ExecuteCompare(), _ => !string.IsNullOrWhiteSpace(JsonSourceTables));
         }
 

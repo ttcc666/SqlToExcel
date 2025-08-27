@@ -7,9 +7,7 @@
              xmlns:vm="clr-namespace:SqlToExcel.ViewModels"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <UserControl.DataContext>
-        <vm:TableMappingViewModel/>
-    </UserControl.DataContext>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>

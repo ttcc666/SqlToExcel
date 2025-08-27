@@ -7,13 +7,13 @@ namespace SqlToExcel.Models
     public class ComparisonReport
     {
         [SugarColumn(IsPrimaryKey = true)]
-        public string TableName { get; set; }
+        public string TableName { get; set; } = string.Empty;
 
         [SugarColumn(IsJson = true, ColumnDataType = "text")]
-        public string[] JsonFields { get; set; }
+        public string[] JsonFields { get; set; } = Array.Empty<string>();
 
         [SugarColumn(IsJson = true, ColumnDataType = "text")]
-        public string[] DbFields { get; set; }
+        public string[] DbFields { get; set; } = Array.Empty<string>();
 
         public DateTime ComparisonDate { get; set; }
 

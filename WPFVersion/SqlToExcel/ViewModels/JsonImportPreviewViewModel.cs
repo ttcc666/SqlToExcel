@@ -8,15 +8,15 @@ namespace SqlToExcel.ViewModels
 {
     public class FieldMappingPair
     {
-        public string OldField { get; set; }
-        public string NewField { get; set; }
+        public required string OldField { get; set; }
+        public required string NewField { get; set; }
     }
 
     public class JsonImportPreviewViewModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

@@ -2,9 +2,9 @@ namespace SqlToExcel.Models
 {
     public class IndexDetail
     {
-        public string IndexName { get; set; }
-        public string ColumnName { get; set; }
-        public string IndexType { get; set; }
+        public required string IndexName { get; set; }
+        public required string ColumnName { get; set; }
+        public required string IndexType { get; set; }
         public bool IsIncludedColumn { get; set; }
         public bool IsPrimaryKey { get; set; }
         public bool IsUnique { get; set; }

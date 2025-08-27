@@ -1,4 +1,5 @@
 using SqlToExcel.Models;
+using SqlToExcel.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,31 +8,36 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
 using System.Threading.Tasks;
-using System.Windows;
 
 namespace SqlToExcel.Services
 {
     public class ConfigService
     {
         private readonly DatabaseService _dbService;
-        private static readonly Lazy<ConfigService> _instance = new Lazy<ConfigService>(() => new ConfigService());
-        public static ConfigService Instance => _instance.Value;
+        private readonly IMessageService _messageService;
 
-        private ConfigService()
+        public ConfigService(DatabaseService dbService, IMessageService messageService)
         {
-            _dbService = DatabaseService.Instance;
+            _dbService = dbService;
+            _messageService = messageService;
         }
 
         public async Task<List<BatchExportConfig>> LoadConfigsAsync()
         {
             try
             {
+                if (_dbService.LocalDb == null)
+                {
+                    await _messageService.ShowErrorAsync("数据库未初始化，无法加载配置");
+                    return new List<BatchExportConfig>();
+                }
+
                 var entities = await _dbService.LocalDb.Queryable<BatchExportConfigEntity>().ToListAsync();
                 return entities.Select(MapToModel).ToList();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"从数据库加载配置时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"从数据库加载配置时出错: {ex.Message}");
                 return new List<BatchExportConfig>();
             }
         }
@@ -40,18 +46,22 @@ namespace SqlToExcel.Services
         {
             try
             {
+                if (_dbService.LocalDb == null)
+                {
+                    await _messageService.ShowErrorAsync("数据库未初始化，无法保存配置");
+                    return false;
+                }
+
                 var existing = await _dbService.LocalDb.Queryable<BatchExportConfigEntity>().InSingleAsync(newConfig.Key);
                 if (existing != null)
                 {
                     if (!overwrite)
                     {
-                        var result = MessageBox.Show(
+                        var shouldOverwrite = await _messageService.ShowConfirmationAsync(
                             $"配置键 '{newConfig.Key}' 已存在。是否要覆盖现有配置？",
-                            "配置已存在",
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Question);
+                            "配置已存在");
 
-                        if (result != MessageBoxResult.Yes)
+                        if (!shouldOverwrite)
                         {
                             return false;
                         }
@@ -65,7 +75,7 @@ namespace SqlToExcel.Services
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"保存配置到数据库时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"保存配置到数据库时出错: {ex.Message}");
                 return false;
             }
         }
@@ -74,6 +84,12 @@ namespace SqlToExcel.Services
         {
             try
             {
+                if (_dbService.LocalDb == null)
+                {
+                    await _messageService.ShowErrorAsync("数据库未初始化，无法删除配置");
+                    return false;
+                }
+
                 var result = await _dbService.LocalDb.Deleteable<BatchExportConfigEntity>().In(key).ExecuteCommandAsync();
                 if (result > 0)
                 {
@@ -84,13 +100,17 @@ namespace SqlToExcel.Services
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"从数据库删除配置时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"从数据库删除配置时出错: {ex.Message}");
                 return false;
             }
         }
 
         public async Task<bool> IsKeyExistsAsync(string key)
         {
+            if (_dbService.LocalDb == null)
+            {
+                return false;
+            }
             return await _dbService.LocalDb.Queryable<BatchExportConfigEntity>().AnyAsync(it => it.Key == key);
         }
 
@@ -107,11 +127,11 @@ namespace SqlToExcel.Services
                 };
                 var json = JsonSerializer.Serialize(configs, options);
                 await File.WriteAllTextAsync(filePath, json);
-                MessageBox.Show($"配置已成功导出到: {filePath}", "导出成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                await _messageService.ShowInformationAsync($"配置已成功导出到: {filePath}", "导出成功");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"导出配置时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"导出配置时出错: {ex.Message}");
             }
         }
 
@@ -121,15 +141,18 @@ namespace SqlToExcel.Services
             {
                 var entities = configs.Select(MapToEntity).ToList();
 
-                await _dbService.LocalDb.Ado.UseTranAsync(async () =>
+                if (_dbService.LocalDb != null)
                 {
-                    await _dbService.LocalDb.Deleteable<BatchExportConfigEntity>().ExecuteCommandAsync();
-                    await _dbService.LocalDb.Insertable(entities).ExecuteCommandAsync();
-                });
+                    await _dbService.LocalDb.Ado.UseTranAsync(async () =>
+                    {
+                        await _dbService.LocalDb.Deleteable<BatchExportConfigEntity>().ExecuteCommandAsync();
+                        await _dbService.LocalDb.Insertable(entities).ExecuteCommandAsync();
+                    });
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"自动保存配置到数据库时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"自动保存配置到数据库时出错: {ex.Message}");
             }
         }
 
@@ -175,11 +198,13 @@ namespace SqlToExcel.Services
 
         public async Task<List<TableMapping>> GetTableMappingsAsync()
         {
+            if (_dbService.LocalDb == null) return new List<TableMapping>();
             return await _dbService.LocalDb.Queryable<TableMapping>().ToListAsync();
         }
 
         public async Task<bool> SaveTableMappingAsync(TableMapping mapping)
         {
+            if (_dbService.LocalDb == null) return false;
             var result = await _dbService.LocalDb.Insertable(mapping).ExecuteCommandAsync();
             if (result > 0) EventService.Publish(new MappingsChangedEvent());
             return result > 0;
@@ -187,6 +212,7 @@ namespace SqlToExcel.Services
 
         public async Task<bool> DeleteTableMappingAsync(int id)
         {
+            if (_dbService.LocalDb == null) return false;
             var result = await _dbService.LocalDb.Deleteable<TableMapping>().In(id).ExecuteCommandAsync();
             if (result > 0) EventService.Publish(new MappingsChangedEvent());
             return result > 0;
@@ -196,16 +222,19 @@ namespace SqlToExcel.Services
         {
             try
             {
-                await _dbService.LocalDb.Ado.UseTranAsync(async () =>
+                if (_dbService.LocalDb != null)
                 {
-                    await _dbService.LocalDb.Deleteable<TableMapping>().ExecuteCommandAsync(); // Delete all
-                    await _dbService.LocalDb.Insertable(mappings.ToList()).ExecuteCommandAsync();
-                });
-                EventService.Publish(new MappingsChangedEvent());
+                    await _dbService.LocalDb.Ado.UseTranAsync(async () =>
+                    {
+                        await _dbService.LocalDb.Deleteable<TableMapping>().ExecuteCommandAsync(); // Delete all
+                        await _dbService.LocalDb.Insertable(mappings.ToList()).ExecuteCommandAsync();
+                    });
+                    EventService.Publish(new MappingsChangedEvent());
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"保存所有表映射时出错: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"保存所有表映射时出错: {ex.Message}");
             }
         }
 
@@ -217,7 +246,7 @@ namespace SqlToExcel.Services
                 ComparisonDate = DateTime.Now
             }).ToList();
 
-            if (entities.Any())
+            if (entities.Any() && _dbService.LocalDb != null)
             {
                 await _dbService.LocalDb.Insertable(entities).ExecuteCommandAsync();
             }
@@ -225,12 +254,16 @@ namespace SqlToExcel.Services
 
         public async Task<List<MissingTable>> GetMissingTablesAsync()
         {
+            if (_dbService.LocalDb == null) return new List<MissingTable>();
             return await _dbService.LocalDb.Queryable<MissingTable>().OrderBy(it => it.ComparisonDate, SqlSugar.OrderByType.Desc).ToListAsync();
         }
 
         public async Task DeleteMissingTablesAsync(IEnumerable<int> ids)
         {
-            await _dbService.LocalDb.Deleteable<MissingTable>().In(ids).ExecuteCommandAsync();
+            if (_dbService.LocalDb != null)
+            {
+                await _dbService.LocalDb.Deleteable<MissingTable>().In(ids).ExecuteCommandAsync();
+            }
         }
     }
 }

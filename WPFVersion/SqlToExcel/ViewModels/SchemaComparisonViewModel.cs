@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using SqlToExcel.Models;
 using SqlToExcel.Services;
 using SqlToExcel.ViewModels;
@@ -30,11 +31,11 @@ namespace SqlToExcel.ViewModels
             set { _isLoading = value; OnPropertyChanged(); }
         }
 
-        public SchemaComparisonViewModel()
+        public SchemaComparisonViewModel(ConfigService configService, DatabaseService databaseService, ExcelExportService excelExportService)
         {
-            _configService = ConfigService.Instance;
-            _databaseService = DatabaseService.Instance;
-            _excelExportService = new ExcelExportService();
+            _configService = configService;
+            _databaseService = databaseService;
+            _excelExportService = excelExportService;
 
             ExportCommand = new RelayCommand(async _ => await ExportAsync(), _ => ComparisonResults != null && ComparisonResults.Any());
             RefreshCommand = new RelayCommand(async _ => await LoadComparisonDataAsync());
@@ -151,8 +152,8 @@ namespace SqlToExcel.ViewModels
             return processedList;
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

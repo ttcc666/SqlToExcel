@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using OfficeOpenXml;
+using SqlToExcel.Services.Interfaces;
 using SqlToExcel.ViewModels;
 using System.Linq;
 using System.Collections.Generic;
@@ -7,19 +8,28 @@ using System.Data;
 using System.IO;
 using OfficeOpenXml.Style;
 using System.Drawing;
-using System.Windows;
 using System.Threading;
 using SqlToExcel.Models;
 using System.Threading.Tasks;
 using System;
+using System.Windows;
 
 namespace SqlToExcel.Services
 {
     public class ExcelExportService
     {
+        private readonly IDialogService _dialogService;
+        private readonly IMessageService _messageService;
+
         static ExcelExportService()
         {
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        }
+
+        public ExcelExportService(IDialogService dialogService, IMessageService messageService)
+        {
+            _dialogService = dialogService;
+            _messageService = messageService;
         }
 
         public async Task<DataTable> GetDataTableAsync(string sql, string dbKey)
@@ -62,10 +72,10 @@ namespace SqlToExcel.Services
                 var task1 = GetDataTableAsync(sqlSource, "source");
                 var task2 = GetDataTableAsync(sqlTarget, destinationDbKey);
 
-                await Task.WhenAll(task1, task2);
+                var results = await Task.WhenAll(task1, task2);
 
-                DataTable dt1 = task1.Result;
-                DataTable dt2 = task2.Result;
+                DataTable dt1 = results[0];
+                DataTable dt2 = results[1];
 
                 var sqlLog = new List<object>
                 {
@@ -81,21 +91,21 @@ namespace SqlToExcel.Services
                 };
 
                 var defaultFileName = fileName ?? $"Export_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-                if (SaveSheetsToFile(sheets, defaultFileName))
+                if (await SaveSheetsToFileAsync(sheets, defaultFileName))
                 {
-                    MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    await _messageService.ShowInformationAsync("Excel 文件已成功导出。", "成功");
                     return true;
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"导出过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"导出过程中发生错误: {ex.Message}");
                 throw; // Re-throw to be caught by the caller if needed
             }
             return false;
         }
 
-        public void ExportSingleSheet(DataTable data, string sheetName)
+        public async Task ExportSingleSheetAsync(DataTable data, string sheetName)
         {
             try
             {
@@ -104,15 +114,20 @@ namespace SqlToExcel.Services
                     [sheetName] = data
                 };
 
-                if (SaveSheetsToFile(sheets, $"Export_{sheetName}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx"))
+                if (await SaveSheetsToFileAsync(sheets, $"Export_{sheetName}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx"))
                 {
-                    MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    await _messageService.ShowInformationAsync("Excel 文件已成功导出。", "成功");
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"导出过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"导出过程中发生错误: {ex.Message}");
             }
+        }
+
+        public void ExportSingleSheet(DataTable data, string sheetName)
+        {
+            ExportSingleSheetAsync(data, sheetName).Wait();
         }
 
         private double CalculateColumnWidth(string text)
@@ -143,25 +158,28 @@ namespace SqlToExcel.Services
             return width;
         }
 
-        private bool SaveSheetsToFile(IDictionary<string, object> sheets, string defaultFileName)
+        private async Task<bool> SaveSheetsToFileAsync(IDictionary<string, object> sheets, string defaultFileName)
         {
-            var saveFileDialog = new SaveFileDialog
-            {
-                Filter = "Excel Files|*.xlsx",
-                Title = "保存 Excel 文件",
-                FileName = defaultFileName
-            };
+            var filePath = await _dialogService.ShowSaveFileDialogAsync(
+                "Excel Files|*.xlsx",
+                defaultFileName,
+                "保存 Excel 文件");
 
-            if (saveFileDialog.ShowDialog() == true)
+            if (!string.IsNullOrEmpty(filePath))
             {
-                var excelBytes = CreateExcelPackageBytesAsync(sheets).Result;
-                File.WriteAllBytes(saveFileDialog.FileName, excelBytes);
+                var excelBytes = await CreateExcelPackageBytesAsync(sheets);
+                await File.WriteAllBytesAsync(filePath, excelBytes);
                 return true;
             }
             return false;
         }
 
-        public void ExportComparisonResults(IEnumerable<TableComparisonResultViewModel> results)
+        private bool SaveSheetsToFile(IDictionary<string, object> sheets, string defaultFileName)
+        {
+            return SaveSheetsToFileAsync(sheets, defaultFileName).Result;
+        }
+
+        public async Task ExportComparisonResultsAsync(IEnumerable<TableComparisonResultViewModel> results)
         {
             try
             {
@@ -173,19 +191,24 @@ namespace SqlToExcel.Services
 
                 if (!sheets.Any())
                 {
-                    MessageBox.Show("没有可导出的数据。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                    await _messageService.ShowInformationAsync("没有可导出的数据。", "提示");
                     return;
                 }
 
-                if (SaveSheetsToFile(sheets, $"FieldComparison_{DateTime.Now:yyyyMMdd}.xlsx"))
+                if (await SaveSheetsToFileAsync(sheets, $"FieldComparison_{DateTime.Now:yyyyMMdd}.xlsx"))
                 {
-                    MessageBox.Show("Excel 文件已成功导出。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    await _messageService.ShowInformationAsync("Excel 文件已成功导出。", "成功");
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"导出过程中发生错误: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _messageService.ShowErrorAsync($"导出过程中发生错误: {ex.Message}");
             }
+        }
+
+        public void ExportComparisonResults(IEnumerable<TableComparisonResultViewModel> results)
+        {
+            ExportComparisonResultsAsync(results).Wait();
         }
 
         public async Task<bool> ExportValidationResultsToExcelAsync(IEnumerable<ValidationRowResultViewModel> validationResults)
@@ -301,10 +324,10 @@ namespace SqlToExcel.Services
             string destinationDbKey = config.Destination == DestinationType.Target ? "target" : "framework";
             var task2 = GetDataTableAsync(config.DataTarget.Sql, destinationDbKey);
 
-            await Task.WhenAll(task1, task2);
+            var results = await Task.WhenAll(task1, task2);
 
-            DataTable dt1 = task1.Result;
-            DataTable dt2 = task2.Result;
+            DataTable dt1 = results[0];
+            DataTable dt2 = results[1];
 
             var sqlLog = new List<object>
             {
@@ -341,7 +364,7 @@ namespace SqlToExcel.Services
                             for (int j = 0; j < dt.Columns.Count; j++)
                             {
                                 var cell = worksheet.Cells[i + 2, j + 1];
-                                cell.Value = dt.Rows[i][j].ToString();
+                                cell.Value = dt.Rows[i][j]?.ToString() ?? string.Empty;
                                 cell.Style.Numberformat.Format = "@";
                             }
                         }
@@ -366,9 +389,9 @@ namespace SqlToExcel.Services
                                 for (int j = 0; j < properties.Length; j++)
                                 {
                                     var cell = worksheet.Cells[i + 2, j + 1];
-                                    object cellValue = properties[j].GetValue(list[i]);
+                                    object? cellValue = properties[j].GetValue(list[i]);
 
-                                    if (itemType == typeof(ComparisonResultItem) && properties[j].Name == "IsInJson") cell.Value = (bool)cellValue ? "✓" : "✗";
+                                    if (itemType == typeof(ComparisonResultItem) && properties[j].Name == "IsInJson") cell.Value = cellValue is bool boolValue && boolValue ? "✓" : "✗";
                                     else cell.Value = cellValue?.ToString();
                                     cell.Style.Numberformat.Format = "@";
                                 }
@@ -521,25 +544,31 @@ namespace SqlToExcel.Services
 
                             for (int i = 0; i < maxRows; i++)
                             {
-                                if (i < sourceIndexCount)
+                                if (i < sourceIndexCount && result.SourceIndexes != null)
                                 {
                                     var index = result.SourceIndexes[i];
-                                    indexSheet.Cells[currentRow + i, 1].Value = index.IndexName;
-                                    indexSheet.Cells[currentRow + i, 2].Value = index.ColumnsDisplay;
-                                    indexSheet.Cells[currentRow + i, 3].Value = index.IsPrimaryKey ? "是" : "否";
-                                    indexSheet.Cells[currentRow + i, 4].Value = index.IsUnique ? "是" : "否";
-                                    indexSheet.Cells[currentRow + i, 5].Value = index.IsClustered ? "是" : "否";
-                                    indexSheet.Cells[currentRow + i, 6].Value = index.IsNonClustered ? "是" : "否";
+                                    if (index != null)
+                                    {
+                                        indexSheet.Cells[currentRow + i, 1].Value = index.IndexName;
+                                        indexSheet.Cells[currentRow + i, 2].Value = index.ColumnsDisplay;
+                                        indexSheet.Cells[currentRow + i, 3].Value = index.IsPrimaryKey ? "是" : "否";
+                                        indexSheet.Cells[currentRow + i, 4].Value = index.IsUnique ? "是" : "否";
+                                        indexSheet.Cells[currentRow + i, 5].Value = index.IsClustered ? "是" : "否";
+                                        indexSheet.Cells[currentRow + i, 6].Value = index.IsNonClustered ? "是" : "否";
+                                    }
                                 }
-                                if (i < targetIndexCount)
+                                if (i < targetIndexCount && result.TargetIndexes != null)
                                 {
                                     var index = result.TargetIndexes[i];
-                                    indexSheet.Cells[currentRow + i, rightBlockStartCol].Value = index.IndexName;
-                                    indexSheet.Cells[currentRow + i, rightBlockStartCol + 1].Value = index.ColumnsDisplay;
-                                    indexSheet.Cells[currentRow + i, rightBlockStartCol + 2].Value = index.IsPrimaryKey ? "是" : "否";
-                                    indexSheet.Cells[currentRow + i, rightBlockStartCol + 3].Value = index.IsUnique ? "是" : "否";
-                                    indexSheet.Cells[currentRow + i, rightBlockStartCol + 4].Value = index.IsClustered ? "是" : "否";
-                                    indexSheet.Cells[currentRow + i, rightBlockStartCol + 5].Value = index.IsNonClustered ? "是" : "否";
+                                    if (index != null)
+                                    {
+                                        indexSheet.Cells[currentRow + i, rightBlockStartCol].Value = index.IndexName;
+                                        indexSheet.Cells[currentRow + i, rightBlockStartCol + 1].Value = index.ColumnsDisplay;
+                                        indexSheet.Cells[currentRow + i, rightBlockStartCol + 2].Value = index.IsPrimaryKey ? "是" : "否";
+                                        indexSheet.Cells[currentRow + i, rightBlockStartCol + 3].Value = index.IsUnique ? "是" : "否";
+                                        indexSheet.Cells[currentRow + i, rightBlockStartCol + 4].Value = index.IsClustered ? "是" : "否";
+                                        indexSheet.Cells[currentRow + i, rightBlockStartCol + 5].Value = index.IsNonClustered ? "是" : "否";
+                                    }
                                 }
                             }
 

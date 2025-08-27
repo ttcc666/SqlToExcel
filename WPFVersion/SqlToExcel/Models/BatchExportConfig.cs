@@ -8,7 +8,7 @@ namespace SqlToExcel.Models
         public DestinationType Destination { get; set; }
         public QueryConfig DataSource { get; set; } = null!;
         public QueryConfig DataTarget { get; set; } = null!;
-        public string Prefix { get; set; }
+        public string Prefix { get; set; } = string.Empty;
     }
 
     public class QueryConfig

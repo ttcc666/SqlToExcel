@@ -155,10 +155,10 @@
                 <views:BatchExportView x:Name="BatchExportView" />
             </TabItem>
             <TabItem Header="表映射配置">
-                <views:TableMappingView/>
+                <views:TableMappingView x:Name="TableMappingView"/>
             </TabItem>
             <TabItem Header="主键/索引对比">
-                <views:SchemaComparisonView/>
+                <views:SchemaComparisonView x:Name="SchemaComparisonView"/>
             </TabItem>
             <TabItem Header="对比报表">
                 <views:ComparisonReportView/>

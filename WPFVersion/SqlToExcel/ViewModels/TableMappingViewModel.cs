@@ -24,15 +24,15 @@ namespace SqlToExcel.ViewModels
 
         public int MappedTablesCount => MappedTables.Count;
 
-        private DbTableInfo _selectedSourceTable;
-        public DbTableInfo SelectedSourceTable
+        private DbTableInfo? _selectedSourceTable;
+        public DbTableInfo? SelectedSourceTable
         {
             get => _selectedSourceTable;
             set { _selectedSourceTable = value; OnPropertyChanged(); }
         }
 
-        private DbTableInfo _selectedTargetTable;
-        public DbTableInfo SelectedTargetTable
+        private DbTableInfo? _selectedTargetTable;
+        public DbTableInfo? SelectedTargetTable
         {
             get => _selectedTargetTable;
             set { _selectedTargetTable = value; OnPropertyChanged(); }
@@ -42,14 +42,14 @@ namespace SqlToExcel.ViewModels
         public ICommand DeleteMappingCommand { get; }
         public ICommand ImportCommand { get; }
 
-        public TableMappingViewModel()
+        public TableMappingViewModel(ConfigService configService, DatabaseService databaseService, ConfigFileService configFileService)
         {
-            _configService = ConfigService.Instance;
-            _databaseService = DatabaseService.Instance;
-            _configFileService = ConfigFileService.Instance;
+            _configService = configService;
+            _databaseService = databaseService;
+            _configFileService = configFileService;
 
             SaveMappingCommand = new RelayCommand(async p => await SaveMappingAsync(), p => SelectedSourceTable != null && SelectedTargetTable != null);
-            DeleteMappingCommand = new RelayCommand(async p => await DeleteMappingAsync(p));
+            DeleteMappingCommand = new RelayCommand(async p => await DeleteMappingAsync(p), p => p != null);
             ImportCommand = new RelayCommand(async p => await ImportMappingsAsync());
 
             MappedTables.CollectionChanged += (s, e) => OnPropertyChanged(nameof(MappedTablesCount));
@@ -119,15 +119,15 @@ namespace SqlToExcel.ViewModels
         {
             var newMapping = new TableMapping
             {
-                SourceTable = SelectedSourceTable.Name,
-                TargetTable = SelectedTargetTable.Name
+                SourceTable = SelectedSourceTable?.Name ?? string.Empty,
+                TargetTable = SelectedTargetTable?.Name ?? string.Empty
             };
 
             await _configService.SaveTableMappingAsync(newMapping);
             await LoadDataAsync();
         }
 
-        private async Task DeleteMappingAsync(object parameter)
+        private async Task DeleteMappingAsync(object? parameter)
         {
             if (parameter is int id)
             {
@@ -136,8 +136,8 @@ namespace SqlToExcel.ViewModels
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

@@ -5,7 +5,7 @@ namespace SqlToExcel.Models
 {
     public class ComparisonResultItem : INotifyPropertyChanged
     {
-        private string _fieldName;
+        private string _fieldName = string.Empty;
         private bool _isInJson;
 
         public string FieldName
@@ -20,9 +20,9 @@ namespace SqlToExcel.Models
             set { _isInJson = value; OnPropertyChanged(); }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

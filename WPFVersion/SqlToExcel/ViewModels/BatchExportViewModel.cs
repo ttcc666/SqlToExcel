@@ -25,7 +25,7 @@ namespace SqlToExcel.ViewModels
     {
         private readonly NaturalStringComparer _stringComparer = new NaturalStringComparer();
 
-        public int Compare(object a, object b)
+        public int Compare(object? a, object? b)
         {
             if (a is BatchExportConfigItemViewModel itemA && b is BatchExportConfigItemViewModel itemB)
             {
@@ -98,10 +98,10 @@ namespace SqlToExcel.ViewModels
 
         public string TotalCountText => $"共 {Items.Count} 项";
 
-        public BatchExportViewModel(ExcelExportService exportService)
+        public BatchExportViewModel(ExcelExportService exportService, ConfigService configService)
         {
             _exportService = exportService;
-            _configService = ConfigService.Instance;
+            _configService = configService;
 
             Items = new ObservableCollection<BatchExportConfigItemViewModel>();
             FilteredItems = CollectionViewSource.GetDefaultView(Items);
@@ -156,7 +156,7 @@ namespace SqlToExcel.ViewModels
 
         private void InitializeDebounceTimer()
         {
-            _debounceTimer = new Timer(async _ => await SaveAllConfigsCallback(), null, Timeout.Infinite, Timeout.Infinite);
+            _debounceTimer = new Timer(_ => _ = SaveAllConfigsCallback(), null, Timeout.Infinite, Timeout.Infinite);
         }
 
         private async Task SaveAllConfigsCallback()
@@ -261,10 +261,10 @@ namespace SqlToExcel.ViewModels
                 string destinationDbKey = item.Config.Destination == DestinationType.Target ? "target" : "framework";
                 var task1 = _exportService.GetDataTableAsync(item.Config.DataSource.Sql, "source");
                 var task2 = _exportService.GetDataTableAsync(item.Config.DataTarget.Sql, destinationDbKey);
-                await Task.WhenAll(task1, task2);
+                var results = await Task.WhenAll(task1, task2);
 
-                DataTable dt1 = task1.Result;
-                DataTable dt2 = task2.Result;
+                DataTable dt1 = results[0];
+                DataTable dt2 = results[1];
 
                 var dualViewModel = new DualPreviewViewModel(dt1, dt2, _exportService);
                 var dualView = new DualPreviewView
@@ -293,9 +293,9 @@ namespace SqlToExcel.ViewModels
             }
         }
 
-        private async Task EditAsync(BatchExportConfigItemViewModel? item)
+        private Task EditAsync(BatchExportConfigItemViewModel? item)
         {
-            if (item == null) return;
+            if (item == null) return Task.CompletedTask;
 
             var editViewModel = new EditBatchSqlViewModel(item.Config);
             var editDialog = new EditBatchSqlDialog
@@ -308,6 +308,7 @@ namespace SqlToExcel.ViewModels
             {
                 _debounceTimer?.Change(200, Timeout.Infinite);
             }
+            return Task.CompletedTask;
         }
 
         private async Task ExportConfigsAsync()
@@ -324,7 +325,7 @@ namespace SqlToExcel.ViewModels
             }
         }
 
-        private async Task ImportConfigAsync()
+        private Task ImportConfigAsync()
         {
             var importViewModel = new ImportJsonViewModel();
             var importDialog = new ImportJsonDialog
@@ -339,14 +340,14 @@ namespace SqlToExcel.ViewModels
                 if (string.IsNullOrWhiteSpace(jsonContent))
                 {
                     MessageBox.Show("导入的内容为空。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
+                    return Task.CompletedTask;
                 }
 
                 try
                 {
                     var importedConfigs = JsonSerializer.Deserialize<List<BatchExportConfig>>(jsonContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-                    if (importedConfigs == null) { /*...*/ return; }
+                    if (importedConfigs == null) { /*...*/ return Task.CompletedTask; }
 
                     int updateCount = 0, addCount = 0;
                     foreach (var importedConfig in importedConfigs)
@@ -380,6 +381,7 @@ namespace SqlToExcel.ViewModels
                     MessageBox.Show($"导入失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+            return Task.CompletedTask;
         }
 
         private string ExtractTableName(string sql)
@@ -460,7 +462,7 @@ namespace SqlToExcel.ViewModels
                     });
                 }
             }
-            catch (Exception ex) { /*...*/ }
+            catch (Exception) { /*...*/ }
             finally { IsBatchExporting = false; }
         }
 

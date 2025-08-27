@@ -15,7 +15,7 @@ namespace SqlToExcel.Services
             {
                 _subscriptions[type] = new List<Action<object>>();
             }
-            _subscriptions[type].Add(obj => action(obj as T));
+            _subscriptions[type].Add(obj => { if (obj is T typedObj) action(typedObj); });
         }
 
         public static void Publish<T>(T eventArgs) where T : class
@@ -37,13 +37,13 @@ namespace SqlToExcel.Services
     {
         public BatchExportConfig Config { get; }
         public bool IsEditMode { get; }
-        public string OriginalKey { get; }
+        public string? OriginalKey { get; }
 
-        public LoadConfigToMainViewEvent(BatchExportConfig config, bool isEditMode = false, string originalKey = "")
+        public LoadConfigToMainViewEvent(BatchExportConfig config, bool isEditMode = false, string? originalKey = null)
         {
             Config = config;
             IsEditMode = isEditMode;
-            OriginalKey = originalKey;
+            OriginalKey = originalKey ?? string.Empty;
         }
     }
 }

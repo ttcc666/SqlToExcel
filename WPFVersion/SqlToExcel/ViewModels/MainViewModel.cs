@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 using SqlSugar;
 using SqlToExcel.Models;
@@ -44,10 +45,10 @@ namespace SqlToExcel.ViewModels
 
     public class JsonMapping
     {
-        public string old_table { get; set; }
-        public List<string> old_fields { get; set; }
-        public string new_table { get; set; }
-        public List<string> new_fields { get; set; }
+        public required string old_table { get; set; }
+        public required List<string> old_fields { get; set; }
+        public required string new_table { get; set; }
+        public required List<string> new_fields { get; set; }
     }
 
     public class MainViewModel : INotifyPropertyChanged
@@ -185,11 +186,13 @@ namespace SqlToExcel.ViewModels
  
         private readonly ExcelExportService _exportService;
         private readonly ThemeService _themeService;
+        private readonly ConfigService _configService;
 
-        public MainViewModel(ExcelExportService exportService, ThemeService themeService)
+        public MainViewModel(ExcelExportService exportService, ThemeService themeService, ConfigService configService)
         {
             _exportService = exportService;
             _themeService = themeService;
+            _configService = configService;
             OpenConfigCommand = new RelayCommand(p => OpenConfig());
             ExitCommand = new RelayCommand(p => Application.Current.Shutdown());
             ExportCommand = new RelayCommand(async p => await ExportAsync(), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery1) && !string.IsNullOrWhiteSpace(SqlQuery2));
@@ -270,7 +273,7 @@ namespace SqlToExcel.ViewModels
         {
             try
             {
-                var mappings = await ConfigService.Instance.GetTableMappingsAsync();
+                var mappings = await _configService.GetTableMappingsAsync();
                 _tableMappings = mappings.ToDictionary(m => m.SourceTable, m => m.TargetTable, StringComparer.OrdinalIgnoreCase);
             }
             catch (Exception ex)
@@ -556,10 +559,10 @@ namespace SqlToExcel.ViewModels
                 string destinationDbKey = SelectedDestination == DestinationType.Target ? "target" : "framework";
                 var task2 = _exportService.GetDataTableAsync(SqlQuery2, destinationDbKey);
 
-                await Task.WhenAll(task1, task2);
+                var results = await Task.WhenAll(task1, task2);
 
-                DataTable dt1 = task1.Result;
-                DataTable dt2 = task2.Result;
+                DataTable dt1 = results[0];
+                DataTable dt2 = results[1];
 
                 StatusMessage = "查询完成，正在打开组合预览窗口...";
 
@@ -620,7 +623,7 @@ namespace SqlToExcel.ViewModels
                 if (_isEditMode)
                 {
                     // 编辑模式：使用现有配置创建ViewModel
-                    saveConfigViewModel = new SaveConfigViewModel(_originalConfig ?? new Models.BatchExportConfig());
+                    saveConfigViewModel = new SaveConfigViewModel(_originalConfig ?? new Models.BatchExportConfig { Prefix = string.Empty });
                 }
                 else
                 {
@@ -642,6 +645,7 @@ namespace SqlToExcel.ViewModels
                     {
                         Key = saveConfigViewModel.ConfigKey,
                         Destination = this.SelectedDestination, // 保存目标选择
+                        Prefix = string.Empty, // 设置默认前缀
                         DataSource = new QueryConfig
                         {
                             SheetName = SheetName1,
@@ -664,10 +668,10 @@ namespace SqlToExcel.ViewModels
 
                     if (shouldDeleteOriginal)
                     {
-                        await ConfigService.Instance.DeleteConfigAsync(_editingConfigKey);
+                        await _configService.DeleteConfigAsync(_editingConfigKey);
                     }
 
-                    if (await ConfigService.Instance.SaveConfigAsync(config, true))
+                    if (await _configService.SaveConfigAsync(config, true))
                     {
                         string message = _isEditMode ?
                             $"配置 '{config.Key}' 已成功更新。" :
@@ -880,7 +884,7 @@ namespace SqlToExcel.ViewModels
 
         private void OpenTableComparison()
         {
-            var viewModel = new TableComparisonViewModel();
+            var viewModel = App.ServiceProvider.GetRequiredService<TableComparisonViewModel>();
             var window = new Window
             {
                 Title = "Target表信息比对",

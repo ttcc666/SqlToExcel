@@ -24,7 +24,7 @@ namespace SqlToExcel.ViewModels
       ""status""
     ]
 }";
-        private ObservableCollection<FieldTypeInfo> _fieldTypes;
+        private ObservableCollection<FieldTypeInfo> _fieldTypes = new();
         private string _statusMessage = "准备就绪";
         private bool _isProcessing = false;
 
@@ -96,7 +96,7 @@ namespace SqlToExcel.ViewModels
                     {
                         PropertyNameCaseInsensitive = true
                     };
-                    request = JsonSerializer.Deserialize<FieldTypeRequest>(normalizedJson, options);
+                    request = JsonSerializer.Deserialize<FieldTypeRequest>(normalizedJson, options) ?? throw new Exception("JSON反序列化失败");
                     
                     if (request == null || string.IsNullOrWhiteSpace(request.table))
                     {
@@ -152,7 +152,7 @@ namespace SqlToExcel.ViewModels
                 StatusMessage = $"正在获取字段类型信息...";
 
                 // 获取字段类型信息
-                Dictionary<string, string> fieldTypesDict = null;
+                Dictionary<string, string>? fieldTypesDict = null;
                 await Task.Run(() =>
                 {
                     fieldTypesDict = DatabaseService.Instance.GetFieldTypesInfo("target", request.table, request.fields);
@@ -231,8 +231,8 @@ namespace SqlToExcel.ViewModels
             StatusMessage = "已清空";
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
