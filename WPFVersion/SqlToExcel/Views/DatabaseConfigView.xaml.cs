@@ -5,10 +5,10 @@ namespace SqlToExcel.Views
 {
     public partial class DatabaseConfigView : Window
     {
-        public DatabaseConfigView()
+        public DatabaseConfigView(DatabaseConfigViewModel viewModel)
         {
             InitializeComponent();
-            DataContext = new DatabaseConfigViewModel();
+            DataContext = viewModel;
         }
     }
 }

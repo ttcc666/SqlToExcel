@@ -38,6 +38,7 @@ public partial class App : Application
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<BatchExportViewModel>();
         services.AddSingleton<TableMappingViewModel>(); // 改为 Singleton
+        services.AddTransient<DatabaseConfigViewModel>();
         services.AddTransient<SchemaComparisonViewModel>();
         services.AddTransient<TableComparisonViewModel>();
 
@@ -47,28 +48,63 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        base.OnStartup(e);
+
+        // The ServiceProvider is already built in the App constructor.
+
+        // 1. Initialize local DB and create the SqlSugarScope
         try
         {
-            base.OnStartup(e);
-
-            // Configure and build service provider
-            var services = new ServiceCollection();
-            ConfigureServices(services);
-            ServiceProvider = services.BuildServiceProvider();
-
-            // Initialize database first
-            DatabaseService.Instance.Initialize();
-
-            var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
-            var mainViewModel = ServiceProvider.GetRequiredService<MainViewModel>();
-            mainWindow.DataContext = mainViewModel;
-            mainWindow.Loaded += (sender, args) => mainViewModel.CheckDatabaseConfiguration();
-            mainWindow.Show();
+            DatabaseService.Instance.InitializeLocalDbAndCreateScope();
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show($"应用程序启动失败: {ex.Message}\n\n详细信息:\n{ex}", "启动错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            Environment.Exit(1);
+            MessageBox.Show($"应用程序启动失败: 无法初始化本地数据库。\n\n详细信息:\n{ex}", "严重错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            Current.Shutdown();
+            return;
         }
+
+        // 2. Loop to test remote connections until successful or user cancels
+        while (true)
+        {
+            try
+            {
+                // Try to test remote connections
+                DatabaseService.Instance.TestRemoteConnections();
+                
+                // If successful, break the loop
+                break;
+            }
+            catch (Exception ex)
+            {
+                // Connection failed, show the configuration dialog
+                var message = $"数据库连接失败: {ex.Message}\n\n请检查并保存您的数据库连接设置。";
+                MessageBox.Show(message, "连接错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+                var configViewModel = ServiceProvider.GetRequiredService<DatabaseConfigViewModel>();
+                var configView = new Views.DatabaseConfigView(configViewModel);
+                
+                bool? dialogResult = configView.ShowDialog();
+
+                if (dialogResult == true)
+                {
+                    // User saved new settings. Dispose the old scope, then re-initialize and let the loop try again.
+                    DatabaseService.Instance.DisposeScope();
+                    DatabaseService.Instance.InitializeLocalDbAndCreateScope();
+                }
+                else
+                {
+                    // User cancelled or closed the dialog, so we shut down.
+                    Current.Shutdown();
+                    return;
+                }
+            }
+        }
+
+        // 3. If connection is successful, show the main window
+        var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+        var mainViewModel = ServiceProvider.GetRequiredService<MainViewModel>();
+        mainWindow.DataContext = mainViewModel;
+        mainWindow.Show();
     }
 }

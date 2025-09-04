@@ -187,12 +187,15 @@ namespace SqlToExcel.ViewModels
         private readonly ExcelExportService _exportService;
         private readonly ThemeService _themeService;
         private readonly ConfigService _configService;
+        private readonly IServiceProvider _serviceProvider;
 
-        public MainViewModel(ExcelExportService exportService, ThemeService themeService, ConfigService configService)
+        public MainViewModel(ExcelExportService exportService, ThemeService themeService, ConfigService configService, IServiceProvider serviceProvider)
         {
             _exportService = exportService;
             _themeService = themeService;
             _configService = configService;
+            _serviceProvider = serviceProvider;
+
             OpenConfigCommand = new RelayCommand(p => OpenConfig());
             ExitCommand = new RelayCommand(p => Application.Current.Shutdown());
             ExportCommand = new RelayCommand(async p => await ExportAsync(), p => IsCoreFunctionalityEnabled && !string.IsNullOrWhiteSpace(SqlQuery1) && !string.IsNullOrWhiteSpace(SqlQuery2));
@@ -211,43 +214,18 @@ namespace SqlToExcel.ViewModels
             SelectTargetDestinationCommand = new RelayCommand(p => SelectedDestination = DestinationType.Target);
             SelectFrameworkDestinationCommand = new RelayCommand(p => SelectedDestination = DestinationType.Framework);
  
-            LoadTableMappings();
- 
             Tables1View = CollectionViewSource.GetDefaultView(Tables1);
             Tables1View.Filter = FilterTables1;
             Tables2View = CollectionViewSource.GetDefaultView(Tables2);
             Tables2View.Filter = FilterTables2;
 
             EventService.Subscribe<MappingsChangedEvent>(e => LoadTableMappings());
-            
-        }
 
-        public void CheckDatabaseConfiguration()
-        {
-            if (DatabaseService.Instance.Initialize())
-            {
-                if (DatabaseService.Instance.IsConfigured())
-                {
-                    IsCoreFunctionalityEnabled = true;
-                    StatusMessage = "数据库已连接，准备就绪。";
-                    LoadTables();
-                }
-                else
-                {
-                    IsCoreFunctionalityEnabled = false;
-                    StatusMessage = "数据库未配置，请从“文件”菜单中打开配置。";
-                    if (Application.Current.MainWindow != null && Application.Current.MainWindow.IsLoaded)
-                    {
-                        OpenConfig();
-                    }
-                }
-            }
-            else
-            {
-                IsCoreFunctionalityEnabled = false;
-                StatusMessage = "数据库初始化失败，请检查应用权限或重启应用。";
-                MessageBox.Show(StatusMessage, "严重错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            // Since startup logic now guarantees a connection, we can initialize directly.
+            IsCoreFunctionalityEnabled = true;
+            StatusMessage = "数据库已连接，准备就绪。";
+            LoadTableMappings();
+            LoadTables();
         }
 
         private void ReloadDestinationData()
@@ -490,12 +468,42 @@ namespace SqlToExcel.ViewModels
 
         private void OpenConfig()
         {
-            var configView = new DatabaseConfigView
+            var configViewModel = _serviceProvider.GetRequiredService<DatabaseConfigViewModel>();
+            var configView = new DatabaseConfigView(configViewModel)
             {
                 Owner = Application.Current.MainWindow
             };
-            configView.ShowDialog();
-            CheckDatabaseConfiguration();
+
+            if (configView.ShowDialog() == true)
+            {
+                // User saved new settings. Attempt a hot reload.
+                StatusMessage = "正在应用新配置...";
+                try
+                {
+                    // 1. Dispose old scope and create a new one with the new settings.
+                    DatabaseService.Instance.DisposeScope();
+                    DatabaseService.Instance.InitializeLocalDbAndCreateScope();
+
+                    // 2. Test the new connection.
+                    DatabaseService.Instance.TestRemoteConnections();
+
+                    // 3. If successful, reload data.
+                    StatusMessage = "新配置应用成功，正在重新加载数据...";
+                    IsCoreFunctionalityEnabled = true;
+                    LoadTableMappings();
+                    LoadTables();
+                    StatusMessage = "数据已重新加载，准备就绪。";
+                }
+                catch (Exception ex)
+                {
+                    // 4. If the new connection fails, disable UI and show an error.
+                    IsCoreFunctionalityEnabled = false;
+                    Tables1.Clear();
+                    Tables2.Clear();
+                    StatusMessage = "应用新配置失败，数据库未连接。";
+                    MessageBox.Show($"尝试使用新配置连接数据库失败: {ex.Message}", "连接错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
         }
 
         private async Task ExportAsync()

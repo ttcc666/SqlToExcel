@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace SqlToExcel.Services
 {
@@ -16,6 +17,7 @@ namespace SqlToExcel.Services
 
         public SqlSugarScope? Db { get; private set; }
         public ISqlSugarClient? LocalDb => Db?.GetConnection("local");
+        private List<ConnectionConfig> _currentConfigs = new List<ConnectionConfig>();
 
         private DatabaseService()
         { }
@@ -27,7 +29,7 @@ namespace SqlToExcel.Services
             return !string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(target);
         }
 
-        public bool Initialize()
+        public void InitializeLocalDbAndCreateScope()
         {
             var connectionConfigs = new List<ConnectionConfig>();
 
@@ -74,30 +76,52 @@ namespace SqlToExcel.Services
             try
             {
                 Db = new SqlSugarScope(connectionConfigs);
+                _currentConfigs = connectionConfigs; // Store the created config list
 
                 // Initialize config table
                 LocalDb?.CodeFirst.InitTables<BatchExportConfigEntity>();
                 LocalDb?.CodeFirst.InitTables<TableMapping>();
                 LocalDb?.CodeFirst.InitTables<ComparisonReport>();
                 LocalDb?.CodeFirst.InitTables<MissingTable>();
-
-                // Validate source/target connections if they exist
-                if (IsConfigured())
-                {
-                    Db.GetConnection("source").Ado.IsValidConnection();
-                    Db.GetConnection("target").Ado.IsValidConnection();
-                    if (connectionConfigs.Any(c => string.Equals(c.ConfigId?.ToString(), "framework", StringComparison.Ordinal)))
-                    {
-                        Db.GetConnection("framework").Ado.IsValidConnection();
-                    }
-                }
-                return true;
             }
             catch (Exception)
             {
                 Db = null;
-                return false;
+                _currentConfigs = new List<ConnectionConfig>(); // Clear configs on failure
+                throw; // Re-throw critical exception if local DB fails
             }
+        }
+
+        public void TestRemoteConnections()
+        {
+            if (Db == null)
+            {
+                throw new InvalidOperationException("SqlSugarScope is not initialized. Cannot test remote connections.");
+            }
+
+            if (IsConfigured())
+            {
+                // Use a simple query to force a real connection and login attempt.
+                // IsValidConnection() was not sufficient to detect the login failure.
+                Db.GetConnection("source").Ado.ExecuteCommand("SELECT 1");
+                Db.GetConnection("target").Ado.ExecuteCommand("SELECT 1");
+
+                var frameworkConfig = _currentConfigs.FirstOrDefault(c => string.Equals(c.ConfigId?.ToString(), "framework", StringComparison.Ordinal));
+                if (frameworkConfig != null)
+                {
+                    Db.GetConnection("framework").Ado.ExecuteCommand("SELECT 1");
+                }
+            }
+        }
+
+        public void DisposeScope()
+        {
+            if (Db != null)
+            {
+                Db.Dispose();
+                Db = null;
+            }
+            _currentConfigs.Clear();
         }
 
         public List<DbTableInfo> GetTables(string dbKey)

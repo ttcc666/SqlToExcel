@@ -1,8 +1,11 @@
 using SqlSugar;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System;
 
 namespace SqlToExcel.ViewModels
 {
@@ -36,6 +39,8 @@ namespace SqlToExcel.ViewModels
         public ICommand TestFrameworkConnectionCommand { get; }
         public ICommand SaveCommand { get; }
 
+        private bool _isSaving = false;
+
         public DatabaseConfigViewModel()
         {
             // Load existing settings if available
@@ -46,7 +51,7 @@ namespace SqlToExcel.ViewModels
             TestSourceConnectionCommand = new RelayCommand(p => TestConnection(SourceConnectionString, "源"));
             TestTargetConnectionCommand = new RelayCommand(p => TestConnection(TargetConnectionString, "目标"));
             TestFrameworkConnectionCommand = new RelayCommand(p => TestConnection(FrameworkConnectionString, "框架库"));
-            SaveCommand = new RelayCommand(p => SaveConfiguration(p as Window));
+            SaveCommand = new RelayCommand(p => SaveConfiguration());
         }
 
         private void TestConnection(string? connectionString, string dbName)
@@ -81,15 +86,64 @@ namespace SqlToExcel.ViewModels
             }
         }
 
-        private void SaveConfiguration(Window? window)
+        private async void SaveConfiguration()
         {
-            Properties.Settings.Default.SourceConnectionString = SourceConnectionString;
-            Properties.Settings.Default.TargetConnectionString = TargetConnectionString;
-            Properties.Settings.Default.FrameworkConnectionString = FrameworkConnectionString;
-            Properties.Settings.Default.Save();
+            if (_isSaving) return;
 
-            MessageBox.Show("配置已保存。", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
-            window?.Close();
+            if (string.IsNullOrWhiteSpace(SourceConnectionString) || string.IsNullOrWhiteSpace(TargetConnectionString))
+            {
+                MessageBox.Show("源数据库和目标数据库的连接字符串不能为空。", "验证失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            _isSaving = true;
+            Mouse.OverrideCursor = Cursors.Wait;
+
+            try
+            {
+                // Run blocking database calls on a background thread
+                await Task.Run(() =>
+                {
+                    using (var testClient = new SqlSugarClient(new ConnectionConfig() { ConnectionString = SourceConnectionString, DbType = DbType.SqlServer, IsAutoCloseConnection = true }))
+                    {
+                        testClient.Ado.ExecuteCommand("SELECT 1");
+                    }
+                    using (var testClient = new SqlSugarClient(new ConnectionConfig() { ConnectionString = TargetConnectionString, DbType = DbType.SqlServer, IsAutoCloseConnection = true }))
+                    {
+                        testClient.Ado.ExecuteCommand("SELECT 1");
+                    }
+                    if (!string.IsNullOrWhiteSpace(FrameworkConnectionString))
+                    {
+                        using (var testClient = new SqlSugarClient(new ConnectionConfig() { ConnectionString = FrameworkConnectionString, DbType = DbType.SqlServer, IsAutoCloseConnection = true }))
+                        {
+                            testClient.Ado.ExecuteCommand("SELECT 1");
+                        }
+                    }
+                });
+
+                // If tests succeed, save the configuration
+                Properties.Settings.Default.SourceConnectionString = SourceConnectionString;
+                Properties.Settings.Default.TargetConnectionString = TargetConnectionString;
+                Properties.Settings.Default.FrameworkConnectionString = FrameworkConnectionString;
+                Properties.Settings.Default.Save();
+
+                // Find and close the dialog on the UI thread
+                var windowToClose = Application.Current.Windows.OfType<Views.DatabaseConfigView>().FirstOrDefault();
+                if (windowToClose != null)
+                {
+                    windowToClose.DialogResult = true;
+                    windowToClose.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"数据库连接测试失败，配置未保存。请检查连接字符串。\n\n错误: {ex.Message}", "测试失败", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                Mouse.OverrideCursor = null;
+                _isSaving = false;
+            }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
